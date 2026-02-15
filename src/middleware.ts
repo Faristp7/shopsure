@@ -1,30 +1,38 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-
-// This would typically come from your auth lib, but middleware runs on Edge runtime
-// so we might need a separate lightweight auth check or just use session cookies.
-// For this template, we'll demonstrate the logic structure.
+import { decodeJwt } from 'jose';
 
 export function middleware(request: NextRequest) {
     const path = request.nextUrl.pathname;
+    const token = request.cookies.get('accessToken')?.value;
 
-    // Mock auth check - in production use real session/token validation
-    // const token = request.cookies.get('session');
-    // const userRole = decodeToken(token).role; 
+    // Admin Route Protection
+    if (path.startsWith('/admin')) {
+        let userRole: string | null = null;
 
-    // For demonstration, let's assume we can't easily get the role in middleware without
-    // an actual auth provider setup (like NextAuth). 
-    // ensuring the file exists and is ready for logic injection.
+        if (token) {
+            try {
+                const decoded = decodeJwt(token);
+                userRole = decoded.role as string;
+            } catch (e) {
+                // Invalid token
+            }
+        }
 
-    // Example protection logic:
+        // 1. If trying to access login page AND already logged in as ADMIN -> Redirect to Dashboard
+        if (path === '/admin/auth') {
+            if (userRole === 'ADMIN') {
+                return NextResponse.redirect(new URL('/admin/dashboard', request.url));
+            }
+            // Allow access to login page if not logged in or not admin
+            return NextResponse.next();
+        }
 
-    // if (path.startsWith('/admin') && userRole !== 'admin') {
-    //   return NextResponse.redirect(new URL('/auth/login', request.url));
-    // }
-
-    // if (path.startsWith('/seller') && userRole !== 'seller') {
-    //   return NextResponse.redirect(new URL('/auth/login', request.url));
-    // }
+        // 2. If trying to access protected admin routes AND (not logged in OR not ADMIN) -> Redirect to Login
+        if (userRole !== 'ADMIN') {
+            return NextResponse.redirect(new URL('/admin/auth', request.url));
+        }
+    }
 
     return NextResponse.next();
 }

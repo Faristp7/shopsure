@@ -1,5 +1,13 @@
 'use client';
 
+import { apiService } from "@/services/api";
+import { AuthResponse } from "@/types/auth";
+
+// Actually, to be safe, I will just use a local error state for now if I can't confirm toast.
+// The file has card components.
+// I will just use `setError` from react-hook-form or a local state for error message.
+
+// ... re-evaluating imports ...
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
@@ -16,6 +24,8 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+// import { apiService } from "@/services/api" // Added above
+// import { AuthResponse } from "@/types/auth" // Added above
 
 const formSchema = z.object({
     email: z.string().email(),
@@ -25,6 +35,7 @@ const formSchema = z.object({
 export default function AdminAuthPage() {
     const router = useRouter()
     const [isLoading, setIsLoading] = useState(false)
+    const [loginError, setLoginError] = useState<string | null>(null)
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -36,12 +47,24 @@ export default function AdminAuthPage() {
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         setIsLoading(true)
-        // Simulate API call
-        setTimeout(() => {
-            console.log(values)
-            setIsLoading(false)
+        setLoginError(null)
+        try {
+            const response = await apiService.post<AuthResponse>('v1/auth/admin/login', values);
+
+            // Store tokens in cookies
+            document.cookie = `accessToken=${response.accessToken}; path=/; max-age=86400; SameSite=Strict`; // 1 day
+            document.cookie = `refreshToken=${response.refreshToken}; path=/; max-age=604800; SameSite=Strict`; // 7 days
+
+            // Optionally store user info in localStorage or Context
+            localStorage.setItem('user', JSON.stringify(response.user));
+
             router.push("/admin/dashboard")
-        }, 1000)
+        } catch (error: any) {
+            console.error("Login failed:", error);
+            setLoginError(error.response?.data?.message || "Login failed. Please check your credentials.");
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     return (
@@ -56,6 +79,11 @@ export default function AdminAuthPage() {
                 <CardContent>
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                            {loginError && (
+                                <div className="p-3 text-sm text-red-500 bg-red-50 border border-red-200 rounded-md">
+                                    {loginError}
+                                </div>
+                            )}
                             <FormField
                                 control={form.control}
                                 name="email"
@@ -76,7 +104,7 @@ export default function AdminAuthPage() {
                                     <FormItem>
                                         <FormLabel>Password</FormLabel>
                                         <FormControl>
-                                            <Input type="password" />
+                                            <Input type="password" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>

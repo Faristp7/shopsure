@@ -9,12 +9,29 @@ const api = axios.create({
 
 // Request interceptor
 api.interceptors.request.use(
-  (config) => {
-    // You can add auth tokens here if needed, e.g., from localStorage or cookies
-    // const token = localStorage.getItem('token');
-    // if (token) {
-    //   config.headers.Authorization = `Bearer ${token}`;
-    // }
+  async (config) => {
+    let token: string | undefined;
+
+    // Client-side: Get token from cookies
+    if (typeof window !== 'undefined') {
+      const match = document.cookie.match(new RegExp('(^| )accessToken=([^;]+)'));
+      if (match) token = match[2];
+    }
+    // Server-side: Get token from next/headers
+    else {
+      try {
+        const { cookies } = await import('next/headers');
+        const cookieStore = await cookies();
+        token = cookieStore.get('accessToken')?.value;
+      } catch (error) {
+        // Ignore errors if outside request context
+      }
+    }
+
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
     return config;
   },
   (error) => {

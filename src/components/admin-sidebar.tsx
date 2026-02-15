@@ -24,6 +24,7 @@ import {
     LogOut,
     Layers
 } from "lucide-react"
+import Link from "next/link";
 
 // Admin menu items
 const items = [
@@ -93,10 +94,10 @@ export function AdminSidebar() {
                             {items.map((item) => (
                                 <SidebarMenuItem key={item.title}>
                                     <SidebarMenuButton asChild>
-                                        <a href={item.url}>
+                                        <Link href={item.url}>
                                             <item.icon />
                                             <span>{item.title}</span>
-                                        </a>
+                                        </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                             ))}
@@ -108,10 +109,10 @@ export function AdminSidebar() {
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton asChild>
-                            <a href="/admin/settings">
+                            <Link href="/admin/settings">
                                 <Settings />
                                 <span>Settings</span>
-                            </a>
+                            </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                     <SidebarMenuItem>

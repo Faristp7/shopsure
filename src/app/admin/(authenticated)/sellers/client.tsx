@@ -89,11 +89,9 @@ export default function SellersClient() {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>ID</TableHead>
                             <TableHead>Name</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Joined</TableHead>
-                            <TableHead className="text-right">Total Revenue</TableHead>
                             <TableHead className="w-[50px]"></TableHead>
                         </TableRow>
                     </TableHeader>
@@ -101,7 +99,6 @@ export default function SellersClient() {
                         {isLoading ? (
                             Array.from({ length: 5 }).map((_, i) => (
                                 <TableRow key={i}>
-                                    <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
                                     <TableCell>
                                         <div className="flex flex-col space-y-2">
                                             <Skeleton className="h-4 w-[120px]" />
@@ -110,7 +107,6 @@ export default function SellersClient() {
                                     </TableCell>
                                     <TableCell><Skeleton className="h-5 w-[100px] rounded-full" /></TableCell>
                                     <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
-                                    <TableCell className="text-right"><Skeleton className="h-4 w-[50px] ml-auto" /></TableCell>
                                     <TableCell><Skeleton className="h-8 w-8 rounded-full" /></TableCell>
                                 </TableRow>
                             ))
@@ -123,7 +119,6 @@ export default function SellersClient() {
                         ) : (
                             sellers.map((seller) => (
                                 <TableRow key={seller.id}>
-                                    <TableCell className="font-medium">{seller.id.substring(0, 8)}...</TableCell>
                                     <TableCell>
                                         <div className="flex flex-col">
                                             <span className="font-medium">{seller.name}</span>
@@ -141,8 +136,7 @@ export default function SellersClient() {
                                             {seller.status.replace(/_/g, ' ')}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell>{format(new Date(seller.createdAt), 'yyyy-MM-dd')}</TableCell>
-                                    <TableCell className="text-right">--</TableCell> {/* Revenue not in Seller interface yet */}
+                                    <TableCell>{format(new Date(seller.createdAt), 'dd MMM yyyy')}</TableCell>
                                     <TableCell>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>

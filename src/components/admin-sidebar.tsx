@@ -80,7 +80,29 @@ const items = [
     },
 ]
 
+import { authService } from "@/services/auth.service"; // Import authService
+import { useRouter } from "next/navigation"; // Import useRouter
+
+// ... existing imports
+
 export function AdminSidebar() {
+    const router = useRouter();
+
+    const handleLogout = async () => {
+        try {
+            await authService.logout();
+        } catch (error) {
+            console.error("Logout failed", error);
+        } finally {
+            // Clear cookies
+            document.cookie = 'accessToken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+            document.cookie = 'refreshToken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+
+            // Redirect to login
+            router.push("/admin/auth");
+        }
+    };
+
     return (
         <Sidebar>
             <SidebarHeader className="border-b p-4">
@@ -116,13 +138,16 @@ export function AdminSidebar() {
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                     <SidebarMenuItem>
-                        <SidebarMenuButton className="text-destructive hover:text-destructive">
+                        <SidebarMenuButton
+                            className="text-destructive hover:text-destructive w-full justify-start cursor-pointer"
+                            onClick={handleLogout}
+                        >
                             <LogOut />
                             <span>Logout</span>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarFooter>
-        </Sidebar>
+        </Sidebar >
     )
 }

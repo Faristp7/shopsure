@@ -1,5 +1,17 @@
 'use client';
 
+import { Skeleton } from "@/components/ui/skeleton"
+import { useState } from "react"
+import { Input } from "@/components/ui/input"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
+import { useDebounce } from "@/hooks/use-debounce"
+
 import {
     Table,
     TableBody,
@@ -25,25 +37,20 @@ import { SellerStatus } from "@/types/seller"
 import { format } from "date-fns"
 
 export default function SellersClient() {
-    // Default to fetching ONBOARDING_INCOMPLETE as per user request, 
-    // but we can potentially make this dynamic with URL search params later.
-    // For now, I'll fetch ALL or just the requested status? 
-    // The user said: "fileter will be status=ONBOARDING_INCOMPLETE and the status will change"
-    // This implies we might want a tab or filter UI. 
-    // For the initial implementation matching the request "fetch all the data also make sure api call is like refer the verification page",
-    // and "if we are not pass status it will fetch all".
-    // I will implement a basic hook that fetches based on a local state or just fetches default for now.
-    // Let's verify what the User specifically asked: "fileter will be status=ONBOARDING_INCOMPLETE"
-    // I will fetch with that status for now.
+    const [search, setSearch] = useState("");
+    const [status, setStatus] = useState<SellerStatus | 'ALL'>(SellerStatus.ONBOARDING_INCOMPLETE);
+    const debouncedSearch = useDebounce(search, 500);
 
     const { data, isLoading, isError } = useQuery({
-        queryKey: ['admin-sellers', SellerStatus.ONBOARDING_INCOMPLETE],
-        queryFn: () => adminSellerService.getSellers({ status: SellerStatus.ONBOARDING_INCOMPLETE }),
+        queryKey: ['admin-sellers', status, debouncedSearch],
+        queryFn: () => adminSellerService.getSellers({
+            status: status === 'ALL' ? undefined : status,
+            search: debouncedSearch || undefined
+        }),
     });
 
     const sellers = data?.items || [];
 
-    if (isLoading) return <div>Loading...</div>;
     if (isError) return <div>Error loading sellers.</div>;
 
     return (
@@ -54,6 +61,28 @@ export default function SellersClient() {
                     <p className="text-muted-foreground">Manage and monitor seller accounts.</p>
                 </div>
                 <Button>Export List</Button>
+            </div>
+
+            <div className="flex items-center space-x-2">
+                <Input
+                    placeholder="Search sellers..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="max-w-sm"
+                />
+                <Select value={status} onValueChange={(val) => setStatus(val as SellerStatus | 'ALL')}>
+                    <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="ALL">All Statuses</SelectItem>
+                        <SelectItem value={SellerStatus.PENDING_EMAIL_VERIFICATION}>Pending Email</SelectItem>
+                        <SelectItem value={SellerStatus.ONBOARDING_INCOMPLETE}>Onboarding Incomplete</SelectItem>
+                        <SelectItem value={SellerStatus.PENDING_ADMIN_APPROVAL}>Pending Approval</SelectItem>
+                        <SelectItem value={SellerStatus.APPROVED}>Approved</SelectItem>
+                        <SelectItem value={SellerStatus.REJECTED}>Rejected</SelectItem>
+                    </SelectContent>
+                </Select>
             </div>
 
             <div className="rounded-md border">
@@ -69,7 +98,23 @@ export default function SellersClient() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {sellers.length === 0 ? (
+                        {isLoading ? (
+                            Array.from({ length: 5 }).map((_, i) => (
+                                <TableRow key={i}>
+                                    <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-col space-y-2">
+                                            <Skeleton className="h-4 w-[120px]" />
+                                            <Skeleton className="h-3 w-[150px]" />
+                                        </div>
+                                    </TableCell>
+                                    <TableCell><Skeleton className="h-5 w-[100px] rounded-full" /></TableCell>
+                                    <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                                    <TableCell className="text-right"><Skeleton className="h-4 w-[50px] ml-auto" /></TableCell>
+                                    <TableCell><Skeleton className="h-8 w-8 rounded-full" /></TableCell>
+                                </TableRow>
+                            ))
+                        ) : sellers.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={6} className="text-center h-24 text-muted-foreground">
                                     No sellers found.

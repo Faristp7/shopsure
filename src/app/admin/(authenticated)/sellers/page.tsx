@@ -8,7 +8,7 @@ export default async function AdminSellersPage() {
     const queryClient = getQueryClient();
 
     await queryClient.prefetchQuery({
-        queryKey: ['admin-sellers', SellerStatus.ONBOARDING_INCOMPLETE],
+        queryKey: ['admin-sellers', SellerStatus.ONBOARDING_INCOMPLETE, ''],
         queryFn: () => adminSellerService.getSellers({ status: SellerStatus.ONBOARDING_INCOMPLETE }),
     });
 

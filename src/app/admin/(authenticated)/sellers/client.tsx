@@ -35,10 +35,12 @@ import { useQuery } from "@tanstack/react-query"
 import { adminSellerService } from "@/services/admin-seller"
 import { SellerStatus } from "@/types/seller"
 import { format } from "date-fns"
+import { SellerDetailsModal } from "./seller-details-modal"
 
 export default function SellersClient() {
     const [search, setSearch] = useState("");
-    const [status, setStatus] = useState<SellerStatus | 'ALL'>(SellerStatus.ONBOARDING_INCOMPLETE);
+    const [status, setStatus] = useState<SellerStatus | 'ALL'>(SellerStatus.PENDING_ADMIN_APPROVAL);
+    const [selectedSellerId, setSelectedSellerId] = useState<string | null>(null);
     const debouncedSearch = useDebounce(search, 500);
 
     const { data, isLoading, isError } = useQuery({
@@ -147,7 +149,9 @@ export default function SellersClient() {
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                <DropdownMenuItem>View Details</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => setSelectedSellerId(seller.id)}>
+                                                    View Details
+                                                </DropdownMenuItem>
                                                 <DropdownMenuSeparator />
                                                 <DropdownMenuItem className="text-green-600">
                                                     <CheckCircle className="mr-2 h-4 w-4" /> Approve
@@ -164,6 +168,12 @@ export default function SellersClient() {
                     </TableBody>
                 </Table>
             </div>
+
+            <SellerDetailsModal
+                id={selectedSellerId}
+                isOpen={!!selectedSellerId}
+                onClose={() => setSelectedSellerId(null)}
+            />
         </div>
     )
 }

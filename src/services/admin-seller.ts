@@ -15,4 +15,7 @@ export const adminSellerService = {
 
         return apiService.get<ListSellersResponse>(url);
     },
+    getSellerById: async (id: string) => {
+        return apiService.get<import('@/types/seller').SellerDetail>(`v1/admin/sellers/${id}`);
+    },
 };

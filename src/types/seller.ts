@@ -39,3 +39,38 @@ export interface ListSellersResponse {
         totalPages: number;
     };
 }
+
+export interface SellerDetail extends Omit<Seller, 'onboarding'> {
+    onboarding: {
+        id: string;
+        brandName: string;
+        brandDescription: string;
+        instagramUrl?: string;
+        logoUrl?: string;
+        publicEmail: string;
+        publicPhone: string;
+        businessType: string;
+        legalBusinessName: string;
+        panNumber: string;
+        gstRegistered: boolean;
+        gstNumber?: string;
+        businessRegistrationNumber?: string;
+        pickupAddressLine1: string;
+        pickupAddressLine2?: string;
+        pickupLandmark?: string;
+        pickupCity: string;
+        pickupState: string;
+        pickupPincode: string;
+        pickupCountry: string;
+        accountHolderName: string;
+        bankAccountNumber: string;
+        bankName: string;
+        ifscCode: string;
+        upiId?: string;
+        agreedTerms: boolean;
+        agreedCommission: boolean;
+        agreedAuthenticity: boolean;
+        agreedReturnPolicy: boolean;
+        submittedAt: string;
+    } | null;
+}

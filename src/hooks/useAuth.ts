@@ -1,35 +1,37 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { User } from '@/lib/auth';
+import { useState, useEffect } from "react";
+import { User } from "@/lib/auth";
 
-// This is a mock hook. Integrate with your actual auth provider (e.g., NextAuth, Clerk)
 export function useAuth() {
-    const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        // Simulate fetching user
-        const fetchUser = async () => {
-            try {
-                // In a client component, you'd typically verify a session token here
-                // For now, we'll just set a mock user after a delay
-                setTimeout(() => {
-                    setUser({
-                        id: '1',
-                        email: 'user@example.com',
-                        role: 'user',
-                        name: 'John Doe',
-                    });
-                    setLoading(false);
-                }, 500);
-            } catch (error) {
-                setLoading(false);
-            }
-        };
+  useEffect(() => {
+    const fetchUser = () => {
+      try {
+        const storedUser = localStorage.getItem("user");
+        if (storedUser) {
+          setUser(JSON.parse(storedUser));
+        }
+      } catch (error) {
+        console.error("Failed to parse user from localStorage", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-        fetchUser();
-    }, []);
+    fetchUser();
+  }, []);
 
-    return { user, loading };
+  const logout = () => {
+    localStorage.removeItem("user");
+    document.cookie =
+      "accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    document.cookie =
+      "refreshToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    setUser(null);
+  };
+
+  return { user, loading, logout };
 }

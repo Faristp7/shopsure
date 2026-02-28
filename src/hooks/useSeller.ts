@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useAuth } from './useAuth';
+import { useAuth } from "./useAuth";
 
 export function useSeller() {
-    const { user, loading } = useAuth();
+  const { user, loading } = useAuth();
 
-    const isSeller = user?.role === 'seller';
+  const isSeller = user?.role === "SELLER";
 
-    return { isSeller, loading, sellerId: user?.id };
+  return { isSeller, loading, sellerId: user?.id };
 }

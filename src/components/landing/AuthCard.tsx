@@ -1,6 +1,4 @@
-"use client";
-
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +13,8 @@ import {
   RotateCcw,
 } from "lucide-react";
 import Link from "next/link";
+import { sellerAuthService } from "@/services/seller-auth.service";
+import { useRouter } from "next/navigation";
 
 interface AuthCardProps {
   onSignup?: () => void;
@@ -24,6 +24,7 @@ interface AuthCardProps {
 const OTP_LENGTH = 6;
 
 const AuthCard = ({ onSignup, onLogin }: AuthCardProps) => {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"signup" | "login">("signup");
   const [showPassword, setShowPassword] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -32,7 +33,16 @@ const AuthCard = ({ onSignup, onLogin }: AuthCardProps) => {
   const [otpVerifying, setOtpVerifying] = useState(false);
   const [otpError, setOtpError] = useState("");
   const [resendTimer, setResendTimer] = useState(0);
+
+  // Registration data
+  const [brandName, setBrandName] = useState("");
+  const [email, setEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState("");
+
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const startResendTimer = () => {
@@ -48,13 +58,62 @@ const AuthCard = ({ onSignup, onLogin }: AuthCardProps) => {
     }, 1000);
   };
 
-  const handleSignupSubmit = (e: React.FormEvent) => {
+  const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setShowOtp(true);
-    setOtp(Array(OTP_LENGTH).fill(""));
-    setOtpError("");
-    startResendTimer();
-    setTimeout(() => inputRefs.current[0]?.focus(), 100);
+    setIsLoading(true);
+    setAuthError("");
+
+    try {
+      await sellerAuthService.register({
+        name: brandName,
+        email: email,
+        mobile: phoneNumber,
+        password: password,
+      });
+
+      setShowOtp(true);
+      setOtp(Array(OTP_LENGTH).fill(""));
+      setOtpError("");
+      startResendTimer();
+      setTimeout(() => inputRefs.current[0]?.focus(), 100);
+    } catch (error: any) {
+      console.error("Registration failed:", error);
+      setAuthError(
+        error.response?.data?.message ||
+          "Registration failed. Please try again.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setAuthError("");
+
+    try {
+      const response = await sellerAuthService.login({
+        email: email,
+        password: password,
+      });
+
+      // Store tokens in cookies
+      document.cookie = `accessToken=${response.accessToken}; path=/; max-age=86400; SameSite=Strict`;
+      document.cookie = `refreshToken=${response.refreshToken}; path=/; max-age=604800; SameSite=Strict`;
+      localStorage.setItem("user", JSON.stringify(response.user));
+
+      router.push("/seller/dashboard");
+      onLogin?.();
+    } catch (error: any) {
+      console.error("Login failed:", error);
+      setAuthError(
+        error.response?.data?.message ||
+          "Login failed. Please check your credentials.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleOtpChange = (index: number, value: string) => {
@@ -91,26 +150,56 @@ const AuthCard = ({ onSignup, onLogin }: AuthCardProps) => {
     inputRefs.current[nextIndex]?.focus();
   };
 
-  const handleVerifyOtp = () => {
+  const handleVerifyOtp = async () => {
     const code = otp.join("");
     if (code.length < OTP_LENGTH) {
       setOtpError("Please enter the complete OTP");
       return;
     }
     setOtpVerifying(true);
-    // Simulate verification
-    setTimeout(() => {
-      setOtpVerifying(false);
+    setOtpError("");
+
+    try {
+      const response = await sellerAuthService.verifyEmailOtp({
+        email: email,
+        otp: code,
+      });
+
+      // Store tokens in cookies
+      document.cookie = `accessToken=${response.accessToken}; path=/; max-age=86400; SameSite=Strict`;
+      document.cookie = `refreshToken=${response.refreshToken}; path=/; max-age=604800; SameSite=Strict`;
+      localStorage.setItem("user", JSON.stringify(response.user));
+
+      router.push("/seller/dashboard");
       onSignup?.();
-    }, 1500);
+    } catch (error: any) {
+      console.error("OTP Verification failed:", error);
+      setOtpError(
+        error.response?.data?.message || "Invalid OTP. Please try again.",
+      );
+    } finally {
+      setOtpVerifying(false);
+    }
   };
 
-  const handleResendOtp = () => {
+  const handleResendOtp = async () => {
     if (resendTimer > 0) return;
+
     setOtp(Array(OTP_LENGTH).fill(""));
     setOtpError("");
-    startResendTimer();
-    inputRefs.current[0]?.focus();
+
+    try {
+      await sellerAuthService.register({
+        name: brandName,
+        email: email,
+        mobile: phoneNumber,
+        password: password,
+      });
+      startResendTimer();
+      inputRefs.current[0]?.focus();
+    } catch (error: any) {
+      setOtpError("Failed to resend OTP. Please try again.");
+    }
   };
 
   const otpFilled = otp.every((d) => d !== "");
@@ -123,7 +212,10 @@ const AuthCard = ({ onSignup, onLogin }: AuthCardProps) => {
           {(["signup", "login"] as const).map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => {
+                setActiveTab(tab);
+                setAuthError("");
+              }}
               className={`relative py-4 text-sm font-semibold transition-colors ${
                 activeTab === tab
                   ? "text-primary bg-accent/50"
@@ -145,6 +237,11 @@ const AuthCard = ({ onSignup, onLogin }: AuthCardProps) => {
       )}
 
       <div className="p-6">
+        {authError && (
+          <div className="mb-4 p-3 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg">
+            {authError}
+          </div>
+        )}
         <AnimatePresence mode="wait">
           {showOtp ? (
             <motion.div
@@ -161,13 +258,11 @@ const AuthCard = ({ onSignup, onLogin }: AuthCardProps) => {
                   <ShieldCheck className="h-7 w-7 text-primary" />
                 </div>
                 <h3 className="text-xl font-bold text-foreground">
-                  Verify Your Phone
+                  Verify Your Email
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   We've sent a 6-digit code to{" "}
-                  <span className="font-semibold text-foreground">
-                    {phoneNumber || "+91 98765 43210"}
-                  </span>
+                  <span className="font-semibold text-foreground">{email}</span>
                 </p>
               </div>
 
@@ -262,18 +357,13 @@ const AuthCard = ({ onSignup, onLogin }: AuthCardProps) => {
                   id="brandName"
                   placeholder="e.g. Priya's Boutique"
                   className="mt-1.5"
+                  value={brandName}
+                  onChange={(e) => setBrandName(e.target.value)}
+                  required
                 />
               </div>
               <div>
-                <Label htmlFor="instagram">Instagram Handle</Label>
-                <Input
-                  id="instagram"
-                  placeholder="@yourbrand"
-                  className="mt-1.5"
-                />
-              </div>
-              <div>
-                <Label htmlFor="phone">Phone Number (OTP verification)</Label>
+                <Label htmlFor="phone">Phone Number</Label>
                 <Input
                   id="phone"
                   type="tel"
@@ -281,15 +371,19 @@ const AuthCard = ({ onSignup, onLogin }: AuthCardProps) => {
                   className="mt-1.5"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
+                  required
                 />
               </div>
               <div>
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email (OTP verification)</Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="you@example.com"
                   className="mt-1.5"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
                 />
               </div>
               <div className="relative">
@@ -299,6 +393,9 @@ const AuthCard = ({ onSignup, onLogin }: AuthCardProps) => {
                   type={showPassword ? "text" : "password"}
                   placeholder="Create a strong password"
                   className="mt-1.5 pr-10"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
                 />
                 <button
                   type="button"
@@ -339,9 +436,15 @@ const AuthCard = ({ onSignup, onLogin }: AuthCardProps) => {
                 type="submit"
                 className="w-full text-base font-semibold h-12"
                 size="lg"
-                disabled={!agreedToTerms}
+                disabled={!agreedToTerms || isLoading}
               >
-                Start Selling <ArrowRight className="ml-2 h-4 w-4" />
+                {isLoading ? (
+                  "Processing..."
+                ) : (
+                  <>
+                    Start Selling <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
               </Button>
               <p className="text-xs text-center text-muted-foreground">
                 Approval within 24 hours · No upfront cost
@@ -354,18 +457,19 @@ const AuthCard = ({ onSignup, onLogin }: AuthCardProps) => {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.25 }}
-              onSubmit={(e) => {
-                e.preventDefault();
-                onLogin?.();
-              }}
+              onSubmit={handleLoginSubmit}
               className="space-y-4"
             >
               <div>
-                <Label htmlFor="loginEmail">Email or Phone</Label>
+                <Label htmlFor="loginEmail">Email</Label>
                 <Input
                   id="loginEmail"
-                  placeholder="you@example.com or +91..."
+                  type="email"
+                  placeholder="you@example.com"
                   className="mt-1.5"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
                 />
               </div>
               <div className="relative">
@@ -375,6 +479,9 @@ const AuthCard = ({ onSignup, onLogin }: AuthCardProps) => {
                   type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
                   className="mt-1.5 pr-10"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
                 />
                 <button
                   type="button"
@@ -392,8 +499,15 @@ const AuthCard = ({ onSignup, onLogin }: AuthCardProps) => {
                 type="submit"
                 className="w-full text-base font-semibold h-12"
                 size="lg"
+                disabled={isLoading}
               >
-                Login to Dashboard <ArrowRight className="ml-2 h-4 w-4" />
+                {isLoading ? (
+                  "Logging in..."
+                ) : (
+                  <>
+                    Login to Dashboard <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
               </Button>
               <p className="text-xs text-center text-muted-foreground">
                 <a href="#" className="text-primary hover:underline">

@@ -21,4 +21,8 @@ export const sellerAuthService = {
       data,
     );
   },
+
+  getProfile: async () => {
+    return apiService.get<any>("/v1/seller/profile");
+  },
 };

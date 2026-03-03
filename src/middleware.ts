@@ -37,7 +37,7 @@ export function middleware(request: NextRequest) {
     // 1. Landing page /seller: If already logged in as SELLER -> Redirect to Dashboard
     if (path === "/seller") {
       if (userRole === "SELLER") {
-        return NextResponse.redirect(new URL("/seller/dashboard", request.url));
+        return NextResponse.redirect(new URL("/seller/onboarding", request.url));
       }
       return NextResponse.next();
     }

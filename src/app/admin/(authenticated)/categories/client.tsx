@@ -9,6 +9,8 @@ import { Plus, Search, Loader2 } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { CategoryNode } from "./components/category-node";
 import { CategorySheet } from "./components/category-sheet";
+import { adminCategoryService } from "@/services/admin-category";
+import { isAxiosError } from "axios";
 
 import {
     ReactFlow,
@@ -104,15 +106,31 @@ export default function CategoriesClient() {
     const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
 
     /* ------------------------ Fetch Categories ------------------------ */
-    const [categories, setCategories] = useState<Category[]>([
-        { id: '1', name: 'Electronics', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-        { id: '2', name: 'Computers', parentId: '1', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-        { id: '3', name: 'Smartphones', parentId: '1', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-        { id: '4', name: 'Laptops', parentId: '1', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-        { id: '5', name: 'Clothing', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-        { id: '6', name: 'Men', parentId: '5', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-        { id: '7', name: 'Women', parentId: '5', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-    ]);
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const fetchCategories = useCallback(async () => {
+        try {
+            setIsLoading(true);
+            const response = await adminCategoryService.getCategories({
+                limit: 100,
+                rootsOnly: false,
+                isActive: true,
+                sortBy: 'sortOrder',
+                sortDirection: 'asc'
+            }); // Fetching all for the tree visually
+            setCategories(response.items || []);
+        } catch (error) {
+            console.error("Failed to fetch categories", error);
+            toast.error("Failed to load categories.");
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchCategories();
+    }, [fetchCategories]);
 
     const filteredCategories = useMemo(() => {
         if (!debouncedSearch) return categories;
@@ -120,33 +138,59 @@ export default function CategoriesClient() {
     }, [categories, debouncedSearch]);
 
     /* ------------------------ Update Parent ------------------------ */
-    const onUpdateParent = useCallback((id: string, parentId?: string) => {
+    const onUpdateParent = useCallback(async (id: string, parentId?: string) => {
+        // Optimistic update
+        const previousCategories = [...categories];
         setCategories((prev) =>
             prev.map(c => (c.id === id ? { ...c, parentId: parentId || null } : c))
         );
-        toast.success('Category hierarchy updated');
-    }, []);
+
+        try {
+            await adminCategoryService.updateCategory(id, { parentId: parentId || null });
+            toast.success('Category hierarchy updated');
+        } catch (error) {
+            console.error("Failed to update hierarchy", error);
+            toast.error("Failed to update hierarchy. Reverting.");
+            setCategories(previousCategories);
+        }
+    }, [categories]);
 
     /* ------------------------ Save Category ------------------------ */
-    const onSaveCategory = useCallback((categoryData: Partial<Category>) => {
-        if (categoryData.id && categoryData.id !== 'new') {
-            setCategories((prev) =>
-                prev.map((c) => (c.id === categoryData.id ? { ...c, ...categoryData } as Category : c))
-            );
-            toast.success('Category updated successfully');
-        } else {
-            const newCategory: Category = {
-                id: Math.random().toString(36).substr(2, 9),
-                name: categoryData.name!,
-                description: categoryData.description || '',
-                slug: categoryData.slug || '',
-                isActive: categoryData.isActive ?? true,
-                parentId: categoryData.parentId || null,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            };
-            setCategories((prev) => [...prev, newCategory]);
-            toast.success('Category created successfully');
+    const onSaveCategory = useCallback(async (categoryData: Partial<Category>) => {
+        try {
+            if (categoryData.id && categoryData.id !== 'new') {
+                const updatedCategory = await adminCategoryService.updateCategory(categoryData.id, categoryData);
+                setCategories((prev) =>
+                    prev.map((c) => (c.id === updatedCategory.id ? updatedCategory : c))
+                );
+                toast.success('Category updated successfully');
+                return true;
+            } else {
+                const newCategoryData = {
+                    name: categoryData.name!,
+                    description: categoryData.description || '',
+                    slug: categoryData.slug || '',
+                    isActive: categoryData.isActive ?? true,
+                    imageUrl: categoryData.imageUrl || '',
+                    sortOrder: categoryData.sortOrder || 0,
+                    metadata: categoryData.metadata,
+                    parentId: categoryData.parentId || null,
+                };
+
+                const newCategory = await adminCategoryService.createCategory(newCategoryData);
+                setCategories((prev) => [...prev, newCategory]);
+                toast.success('Category created successfully');
+                return true;
+            }
+        } catch (error) {
+            console.error("Error saving category", error);
+            if (isAxiosError(error)) {
+                const message = error.response?.data?.message || error.response?.data?.error || "Validation failed";
+                toast.error(message);
+            } else {
+                toast.error("Failed to save category. Please try again.");
+            }
+            return false;
         }
     }, []);
 
@@ -281,7 +325,12 @@ export default function CategoriesClient() {
             </div>
 
             {/* Flow */}
-            <div className="flex-1 rounded-xl border bg-slate-50 shadow-inner overflow-hidden">
+            <div className="flex-1 rounded-xl border bg-slate-50 shadow-inner overflow-hidden relative">
+                {isLoading && (
+                    <div className="absolute inset-0 z-10 bg-white/50 flex items-center justify-center">
+                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    </div>
+                )}
                 <ReactFlow
                     nodes={nodes}
                     edges={edges}

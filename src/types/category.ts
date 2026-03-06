@@ -5,6 +5,11 @@ export interface Category {
     slug?: string;
     imageUrl?: string;
     isActive: boolean;
+    sortOrder?: number;
+    metadata?: {
+        seoTitle?: string;
+        seoDescription?: string;
+    };
     parentId?: string | null;
     parent?: Category;
     subCategories?: Category[];
@@ -17,12 +22,17 @@ export interface ListCategoriesQuery {
     limit?: number;
     search?: string;
     isActive?: boolean;
+    rootsOnly?: boolean;
+    sortBy?: string;
+    sortDirection?: 'asc' | 'desc';
 }
 
 export interface ListCategoriesResponse {
     items: Category[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
+    meta: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
 }

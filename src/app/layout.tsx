@@ -4,12 +4,20 @@ import "@/styles/globals.css";
 import QueryProvider from "@/providers/query-provider";
 import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@/lib/utils";
+import { PWASetup } from "@/components/pwa-setup";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: "shopsure",
   description: "Modern Admin UI with Next.js & Shadcn",
+};
+
+export const viewport = {
+  themeColor: "#000000",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({
@@ -33,6 +41,7 @@ export default function RootLayout({
             {children}
           </QueryProvider>
         </ThemeProvider>
+        <PWASetup />
       </body>
     </html>
   );

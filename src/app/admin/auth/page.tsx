@@ -40,8 +40,8 @@ export default function AdminAuthPage() {
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
-            email: "",
-            password: "",
+            email: "admin@shopsure.com",
+            password: "AdminPassword123",
         },
     })
 

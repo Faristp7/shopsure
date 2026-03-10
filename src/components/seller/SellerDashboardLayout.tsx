@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { authService } from "@/services/auth.service";
 
 const navItems = [
   {
@@ -61,6 +62,22 @@ export default function SellerDashboardLayout({
     isActive(item.href),
   );
 
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+    } catch (error) {
+      console.error("Logout failed", error);
+    } finally {
+      // Clear cookies
+      document.cookie = 'accessToken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+      document.cookie = 'refreshToken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+
+      // Redirect to login
+      router.push("/seller");
+    }
+  };
+
+
   // MOBILE LAYOUT
   if (isMobile) {
     return (
@@ -87,11 +104,10 @@ export default function SellerDashboardLayout({
                     router.push(item.href);
                     setMoreMenuOpen(false);
                   }}
-                  className={`flex flex-col items-center gap-1 py-3 px-1 rounded-lg text-xs font-medium transition-colors ${
-                    isActive(item.href)
+                  className={`flex flex-col items-center gap-1 py-3 px-1 rounded-lg text-xs font-medium transition-colors ${isActive(item.href)
                       ? "bg-primary/10 text-primary"
                       : "text-muted-foreground hover:bg-muted"
-                  }`}
+                    }`}
                 >
                   <item.icon className="h-5 w-5" />
                   <span className="truncate">{item.label}</span>
@@ -111,7 +127,7 @@ export default function SellerDashboardLayout({
               </button>
               <button
                 onClick={() => {
-                  router.push("/");
+                  handleLogout();
                   setMoreMenuOpen(false);
                 }}
                 className="flex items-center gap-2 flex-1 px-3 py-2.5 rounded-lg text-sm text-destructive hover:bg-destructive/10 transition-colors"
@@ -132,9 +148,8 @@ export default function SellerDashboardLayout({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex flex-col items-center justify-center flex-1 gap-0.5 text-[10px] font-medium transition-colors relative ${
-                    active ? "text-primary" : "text-muted-foreground"
-                  }`}
+                  className={`flex flex-col items-center justify-center flex-1 gap-0.5 text-[10px] font-medium transition-colors relative ${active ? "text-primary" : "text-muted-foreground"
+                    }`}
                 >
                   {active && (
                     <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-primary rounded-full" />
@@ -147,11 +162,10 @@ export default function SellerDashboardLayout({
             {/* More button */}
             <button
               onClick={() => setMoreMenuOpen((v) => !v)}
-              className={`flex flex-col items-center justify-center flex-1 gap-0.5 text-[10px] font-medium transition-colors relative ${
-                moreMenuOpen || secondaryActive
+              className={`flex flex-col items-center justify-center flex-1 gap-0.5 text-[10px] font-medium transition-colors relative ${moreMenuOpen || secondaryActive
                   ? "text-primary"
                   : "text-muted-foreground"
-              }`}
+                }`}
             >
               {(moreMenuOpen || secondaryActive) && (
                 <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-primary rounded-full" />
@@ -176,9 +190,8 @@ export default function SellerDashboardLayout({
       )}
 
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-sidebar text-sidebar-foreground flex flex-col transform transition-transform lg:transform-none ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        }`}
+        className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-sidebar text-sidebar-foreground flex flex-col transform transition-transform lg:transform-none ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          }`}
       >
         <div className="h-16 flex items-center justify-between px-5 border-b border-sidebar-border">
           <div className="flex items-center gap-2">
@@ -207,11 +220,10 @@ export default function SellerDashboardLayout({
                 key={item.href}
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  active
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${active
                     ? "bg-sidebar-accent text-sidebar-primary-foreground"
                     : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-                }`}
+                  }`}
               >
                 <item.icon className="h-5 w-5 flex-shrink-0" />
                 {item.label}
@@ -222,7 +234,7 @@ export default function SellerDashboardLayout({
 
         <div className="p-3 border-t border-sidebar-border">
           <button
-            onClick={() => router.push("/")}
+            onClick={handleLogout}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent/50 w-full transition-colors"
           >
             <LogOut className="h-5 w-5" />

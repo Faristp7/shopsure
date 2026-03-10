@@ -63,7 +63,10 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Do not attempt to refresh token for authentication endpoints
+    const isAuthRequest = originalRequest.url?.includes('/auth/');
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
       if (isRefreshing) {
         return new Promise(function (resolve, reject) {
           failedQueue.push({ resolve, reject });
@@ -144,7 +147,15 @@ api.interceptors.response.use(
           // Optional: clear cookies
           document.cookie = 'accessToken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
           document.cookie = 'refreshToken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-          window.location.href = '/admin/auth';
+
+          const currentPath = window.location.pathname;
+          if (currentPath.startsWith('/seller')) {
+            window.location.href = '/seller';
+          } else if (currentPath.startsWith('/admin')) {
+            window.location.href = '/admin/auth';
+          } else {
+            window.location.href = '/login';
+          }
         }
         return Promise.reject(err);
       } finally {

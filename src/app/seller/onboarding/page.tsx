@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { onboardingSchema, OnboardingFormValues } from "./schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,37 +43,50 @@ const OnboardingPage = () => {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string>("");
 
-  const [formData, setFormData] = useState<OnboardingSubmitData>({
-    brand_name: "",
-    brand_description: "",
-    instagram_url: "",
-    logo_url: "",
-    public_email: "",
-    public_phone: "",
-    business_type: "individual",
-    legal_business_name: "",
-    pan_number: "",
-    gst_registered: false,
-    gst_number: "",
-    business_registration_number: "",
-    address_line_1: "",
-    address_line_2: "",
-    landmark: "",
-    city: "",
-    state: "",
-    pincode: "",
-    country: "India",
-    account_holder_name: "",
-    account_number: "",
-    ifsc_code: "",
-    bank_name: "",
-    confirm_account_number: "",
-    upi_id: "",
-    agreed_terms: false,
-    agreed_commission: false,
-    agreed_authenticity: false,
-    agreed_return_policy: false,
+  const {
+    register,
+    handleSubmit: handleRHFSubmit,
+    setValue,
+    watch,
+    reset,
+    formState: { errors },
+  } = useForm<OnboardingFormValues>({
+    resolver: zodResolver(onboardingSchema) as any,
+    defaultValues: {
+      brand_name: "",
+      brand_description: "",
+      instagram_url: "",
+      logo_url: "",
+      public_email: "",
+      public_phone: "",
+      business_type: "individual",
+      legal_business_name: "",
+      pan_number: "",
+      gst_registered: false,
+      gst_number: "",
+      business_registration_number: "",
+      address_line_1: "",
+      address_line_2: "",
+      landmark: "",
+      city: "",
+      state: "",
+      pincode: "",
+      country: "India",
+      account_holder_name: "",
+      account_number: "",
+      ifsc_code: "",
+      bank_name: "",
+      confirm_account_number: "",
+      upi_id: "",
+      agreed_terms: false,
+      agreed_commission: false,
+      agreed_authenticity: false,
+      agreed_return_policy: false,
+    },
   });
+
+  const isGstRegistered = watch("gst_registered");
+  const logoUrl = watch("logo_url");
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -78,12 +94,11 @@ const OnboardingPage = () => {
         const profile = await sellerAuthService.getProfile();
         setStatus(profile.status);
         if (profile.onboarding) {
-          // Map backend response to form data if needed
-          // For now, let's assume the backend returns what we need or we just show "pending"
-          setFormData((prev) => ({
-            ...prev,
-            ...profile.onboarding, // This might need mapping if fields differ
-          }));
+          reset(profile.onboarding as OnboardingFormValues);
+          if (profile.onboarding.logo_url) {
+            setLogoPreview(profile.onboarding.logo_url);
+            setValue("logo_url", profile.onboarding.logo_url);
+          }
         }
 
         if (profile.status === SellerStatus.APPROVED) {
@@ -97,18 +112,7 @@ const OnboardingPage = () => {
     };
 
     fetchProfile();
-  }, [router]);
-
-  const handleInputChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >,
-  ) => {
-    const { name, value, type } = e.target;
-    const val =
-      type === "checkbox" ? (e.target as HTMLInputElement).checked : value;
-    setFormData((prev) => ({ ...prev, [name]: val }));
-  };
+  }, [router, reset, setValue]);
 
   const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -125,7 +129,7 @@ const OnboardingPage = () => {
     setUploading(true);
     try {
       const response = await mediaService.uploadLogo(file);
-      setFormData((prev) => ({ ...prev, logo_url: response.url }));
+      setValue("logo_url", response.url, { shouldValidate: true });
       toast.success("Logo uploaded successfully");
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to upload logo");
@@ -136,32 +140,15 @@ const OnboardingPage = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (formData.account_number !== formData.confirm_account_number) {
-      toast.error("Account numbers do not match");
-      return;
-    }
-
-    if (!formData.logo_url) {
+  const onSubmit = async (data: OnboardingFormValues) => {
+    if (!data.logo_url) {
       toast.error("Please upload a brand logo");
-      return;
-    }
-
-    if (
-      !formData.agreed_terms ||
-      !formData.agreed_commission ||
-      !formData.agreed_authenticity ||
-      !formData.agreed_return_policy
-    ) {
-      toast.error("Please agree to all terms and conditions");
       return;
     }
 
     setSubmitting(true);
     try {
-      await sellerOnboardingService.submit(formData);
+      await sellerOnboardingService.submit(data as unknown as OnboardingSubmitData);
       toast.success("Onboarding details submitted successfully!");
       setStatus(SellerStatus.PENDING_ADMIN_APPROVAL);
       window.scrollTo(0, 0);
@@ -277,7 +264,7 @@ const OnboardingPage = () => {
           className={`${isPending && !showForm ? "hidden" : "block"} space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500`}
         >
           <form
-            onSubmit={handleSubmit}
+            onSubmit={handleRHFSubmit(onSubmit)}
             className="space-y-8 bg-card border border-border rounded-3xl p-6 sm:p-10 shadow-sm transition-all duration-300"
           >
             {/* Section: Brand */}
@@ -296,26 +283,24 @@ const OnboardingPage = () => {
                   <Label htmlFor="brand_name">Brand Name</Label>
                   <Input
                     id="brand_name"
-                    name="brand_name"
+                    {...register("brand_name")}
                     placeholder="e.g. Acme Premium"
-                    value={formData.brand_name}
-                    onChange={handleInputChange}
                     disabled={isDisabled}
                     required
                   />
+                  {errors.brand_name && (<p className="text-red-500 text-xs mt-1">{errors.brand_name.message?.toString()}</p>)}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="instagram_url">Instagram Profile</Label>
                   <Input
                     id="instagram_url"
-                    name="instagram_url"
+                    {...register("instagram_url")}
                     type="url"
                     placeholder="https://instagram.com/yourbrand"
-                    value={formData.instagram_url}
-                    onChange={handleInputChange}
                     disabled={isDisabled}
                     required
                   />
+                  {errors.instagram_url && (<p className="text-red-500 text-xs mt-1">{errors.instagram_url.message?.toString()}</p>)}
                 </div>
               </div>
 
@@ -325,24 +310,22 @@ const OnboardingPage = () => {
                 </Label>
                 <Textarea
                   id="brand_description"
-                  name="brand_description"
+                  {...register("brand_description")}
                   placeholder="Tell us about what makes your brand unique..."
                   className="min-h-[120px] resize-none"
-                  value={formData.brand_description}
-                  onChange={handleInputChange}
                   disabled={isDisabled}
                   required
                 />
+                {errors.brand_description && (<p className="text-red-500 text-xs mt-1">{errors.brand_description.message?.toString()}</p>)}
               </div>
 
               <div className="space-y-2">
                 <Label>Brand Logo</Label>
                 <div
-                  className={`mt-1.5 border-2 border-dashed rounded-2xl p-10 text-center transition-all relative overflow-hidden ${
-                    isDisabled
+                  className={`mt-1.5 border-2 border-dashed rounded-2xl p-10 text-center transition-all relative overflow-hidden ${isDisabled
                       ? "bg-muted/30 border-border opacity-60"
                       : "border-border hover:border-primary/50 hover:bg-primary/5 cursor-pointer"
-                  }`}
+                    }`}
                   onClick={() =>
                     !isDisabled &&
                     !uploading &&
@@ -365,10 +348,10 @@ const OnboardingPage = () => {
                         Uploading logo...
                       </p>
                     </div>
-                  ) : logoPreview || formData.logo_url ? (
+                  ) : logoPreview || logoUrl ? (
                     <div className="flex flex-col items-center">
                       <img
-                        src={logoPreview || formData.logo_url}
+                        src={logoPreview || logoUrl}
                         alt="Logo preview"
                         className="h-20 w-20 object-contain rounded-lg mb-4"
                       />
@@ -407,26 +390,24 @@ const OnboardingPage = () => {
                   <Label htmlFor="public_email">Public Support Email</Label>
                   <Input
                     id="public_email"
-                    name="public_email"
+                    {...register("public_email")}
                     type="email"
                     placeholder="support@yourbrand.com"
-                    value={formData.public_email}
-                    onChange={handleInputChange}
                     disabled={isDisabled}
                     required
                   />
+                  {errors.public_email && (<p className="text-red-500 text-xs mt-1">{errors.public_email.message?.toString()}</p>)}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="public_phone">Public Support Phone</Label>
                   <Input
                     id="public_phone"
-                    name="public_phone"
+                    {...register("public_phone")}
                     placeholder="9876543210"
-                    value={formData.public_phone}
-                    onChange={handleInputChange}
                     disabled={isDisabled}
                     required
                   />
+                  {errors.public_phone && (<p className="text-red-500 text-xs mt-1">{errors.public_phone.message?.toString()}</p>)}
                 </div>
               </div>
             </section>
@@ -447,10 +428,8 @@ const OnboardingPage = () => {
                   <Label htmlFor="business_type">Business Type</Label>
                   <select
                     id="business_type"
-                    name="business_type"
+                    {...register("business_type")}
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    value={formData.business_type}
-                    onChange={handleInputChange}
                     disabled={isDisabled}
                   >
                     <option value="individual">
@@ -467,26 +446,24 @@ const OnboardingPage = () => {
                   </Label>
                   <Input
                     id="legal_business_name"
-                    name="legal_business_name"
+                    {...register("legal_business_name")}
                     placeholder="As per PAN records"
-                    value={formData.legal_business_name}
-                    onChange={handleInputChange}
                     disabled={isDisabled}
                     required
                   />
+                  {errors.legal_business_name && (<p className="text-red-500 text-xs mt-1">{errors.legal_business_name.message?.toString()}</p>)}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="pan_number">Business PAN Number</Label>
                   <Input
                     id="pan_number"
-                    name="pan_number"
+                    {...register("pan_number")}
                     placeholder="ABCDE1234F"
                     className="uppercase"
-                    value={formData.pan_number}
-                    onChange={handleInputChange}
                     disabled={isDisabled}
                     required
                   />
+                  {errors.pan_number && (<p className="text-red-500 text-xs mt-1">{errors.pan_number.message?.toString()}</p>)}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="business_registration_number">
@@ -494,12 +471,11 @@ const OnboardingPage = () => {
                   </Label>
                   <Input
                     id="business_registration_number"
-                    name="business_registration_number"
+                    {...register("business_registration_number")}
                     placeholder="U74999MH2020PTC123456"
-                    value={formData.business_registration_number}
-                    onChange={handleInputChange}
                     disabled={isDisabled}
                   />
+                  {errors.business_registration_number && (<p className="text-red-500 text-xs mt-1">{errors.business_registration_number.message?.toString()}</p>)}
                 </div>
               </div>
 
@@ -507,10 +483,8 @@ const OnboardingPage = () => {
                 <input
                   type="checkbox"
                   id="gst_registered"
-                  name="gst_registered"
+                  {...register("gst_registered")}
                   className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
-                  checked={formData.gst_registered}
-                  onChange={handleInputChange}
                   disabled={isDisabled}
                 />
                 <Label htmlFor="gst_registered" className="cursor-pointer">
@@ -518,19 +492,18 @@ const OnboardingPage = () => {
                 </Label>
               </div>
 
-              {formData.gst_registered && (
+              {isGstRegistered && (
                 <div className="space-y-2 animate-in fade-in duration-300">
                   <Label htmlFor="gst_number">GSTIN Number</Label>
                   <Input
                     id="gst_number"
-                    name="gst_number"
+                    {...register("gst_number")}
                     placeholder="29ABCDE1234F2Z5"
                     className="uppercase"
-                    value={formData.gst_number}
-                    onChange={handleInputChange}
                     disabled={isDisabled}
-                    required={formData.gst_registered}
+                    required={isGstRegistered}
                   />
+                  {errors.gst_number && (<p className="text-red-500 text-xs mt-1">{errors.gst_number.message?.toString()}</p>)}
                 </div>
               )}
             </section>
@@ -551,13 +524,12 @@ const OnboardingPage = () => {
                   <Label htmlFor="address_line_1">Address Line 1</Label>
                   <Input
                     id="address_line_1"
-                    name="address_line_1"
+                    {...register("address_line_1")}
                     placeholder="House/Plot No, Street"
-                    value={formData.address_line_1}
-                    onChange={handleInputChange}
                     disabled={isDisabled}
                     required
                   />
+                  {errors.address_line_1 && (<p className="text-red-500 text-xs mt-1">{errors.address_line_1.message?.toString()}</p>)}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="address_line_2">
@@ -565,61 +537,56 @@ const OnboardingPage = () => {
                   </Label>
                   <Input
                     id="address_line_2"
-                    name="address_line_2"
+                    {...register("address_line_2")}
                     placeholder="Area, Locality"
-                    value={formData.address_line_2}
-                    onChange={handleInputChange}
                     disabled={isDisabled}
                     required
                   />
+                  {errors.address_line_2 && (<p className="text-red-500 text-xs mt-1">{errors.address_line_2.message?.toString()}</p>)}
                 </div>
                 <div className="grid sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="landmark">Landmark</Label>
                     <Input
                       id="landmark"
-                      name="landmark"
+                      {...register("landmark")}
                       placeholder="Near..."
-                      value={formData.landmark}
-                      onChange={handleInputChange}
                       disabled={isDisabled}
                     />
+                    {errors.landmark && (<p className="text-red-500 text-xs mt-1">{errors.landmark.message?.toString()}</p>)}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="city">City</Label>
                     <Input
                       id="city"
-                      name="city"
+                      {...register("city")}
                       placeholder="Mumbai"
-                      value={formData.city}
-                      onChange={handleInputChange}
                       disabled={isDisabled}
                       required
                     />
+                    {errors.city && (<p className="text-red-500 text-xs mt-1">{errors.city.message?.toString()}</p>)}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="state">State</Label>
                     <Input
                       id="state"
-                      name="state"
+                      {...register("state")}
                       placeholder="Maharashtra"
-                      value={formData.state}
-                      onChange={handleInputChange}
                       disabled={isDisabled}
                       required
                     />
+                    {errors.state && (<p className="text-red-500 text-xs mt-1">{errors.state.message?.toString()}</p>)}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="pincode">Pincode</Label>
                     <Input
                       id="pincode"
-                      name="pincode"
+                      {...register("pincode")}
                       placeholder="400001"
-                      value={formData.pincode}
-                      onChange={handleInputChange}
                       disabled={isDisabled}
                       required
                     />
+                    {errors.pincode && (<p className="text-red-500 text-xs mt-1">{errors.pincode.message?.toString()}</p>)}
                   </div>
                 </div>
               </div>
@@ -643,38 +610,35 @@ const OnboardingPage = () => {
                   </Label>
                   <Input
                     id="account_holder_name"
-                    name="account_holder_name"
+                    {...register("account_holder_name")}
                     placeholder="As per bank records"
-                    value={formData.account_holder_name}
-                    onChange={handleInputChange}
                     disabled={isDisabled}
                     required
                   />
+                  {errors.account_holder_name && (<p className="text-red-500 text-xs mt-1">{errors.account_holder_name.message?.toString()}</p>)}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="bank_name">Bank Name</Label>
                   <Input
                     id="bank_name"
-                    name="bank_name"
+                    {...register("bank_name")}
                     placeholder="e.g. HDFC Bank"
-                    value={formData.bank_name}
-                    onChange={handleInputChange}
                     disabled={isDisabled}
                     required
                   />
+                  {errors.bank_name && (<p className="text-red-500 text-xs mt-1">{errors.bank_name.message?.toString()}</p>)}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="account_number">Bank Account Number</Label>
                   <Input
                     id="account_number"
-                    name="account_number"
+                    {...register("account_number")}
                     type="password"
                     placeholder="Enter account number"
-                    value={formData.account_number}
-                    onChange={handleInputChange}
                     disabled={isDisabled}
                     required
                   />
+                  {errors.account_number && (<p className="text-red-500 text-xs mt-1">{errors.account_number.message?.toString()}</p>)}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="confirm_account_number">
@@ -682,37 +646,34 @@ const OnboardingPage = () => {
                   </Label>
                   <Input
                     id="confirm_account_number"
-                    name="confirm_account_number"
+                    {...register("confirm_account_number")}
                     placeholder="Re-enter account number"
-                    value={formData.confirm_account_number}
-                    onChange={handleInputChange}
                     disabled={isDisabled}
                     required={!isDisabled}
                   />
+                  {errors.confirm_account_number && (<p className="text-red-500 text-xs mt-1">{errors.confirm_account_number.message?.toString()}</p>)}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="ifsc_code">IFSC Code</Label>
                   <Input
                     id="ifsc_code"
-                    name="ifsc_code"
+                    {...register("ifsc_code")}
                     placeholder="HDFC0001234"
                     className="uppercase"
-                    value={formData.ifsc_code}
-                    onChange={handleInputChange}
                     disabled={isDisabled}
                     required
                   />
+                  {errors.ifsc_code && (<p className="text-red-500 text-xs mt-1">{errors.ifsc_code.message?.toString()}</p>)}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="upi_id">UPI ID (Optional)</Label>
                   <Input
                     id="upi_id"
-                    name="upi_id"
+                    {...register("upi_id")}
                     placeholder="yourname@bank"
-                    value={formData.upi_id}
-                    onChange={handleInputChange}
                     disabled={isDisabled}
                   />
+                  {errors.upi_id && (<p className="text-red-500 text-xs mt-1">{errors.upi_id.message?.toString()}</p>)}
                 </div>
               </div>
             </section>
@@ -725,10 +686,8 @@ const OnboardingPage = () => {
                     <input
                       type="checkbox"
                       id="agreed_terms"
-                      name="agreed_terms"
+                      {...register("agreed_terms")}
                       className="mt-1 w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
-                      checked={formData.agreed_terms}
-                      onChange={handleInputChange}
                       required
                     />
                     <Label
@@ -741,15 +700,14 @@ const OnboardingPage = () => {
                       </span>{" "}
                       of ShopSure.
                     </Label>
+                    {errors.agreed_terms && (<p className="text-red-500 text-xs mt-1 w-full block">{errors.agreed_terms.message?.toString()}</p>)}
                   </div>
                   <div className="flex items-start space-x-3">
                     <input
                       type="checkbox"
                       id="agreed_commission"
-                      name="agreed_commission"
+                      {...register("agreed_commission")}
                       className="mt-1 w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
-                      checked={formData.agreed_commission}
-                      onChange={handleInputChange}
                       required
                     />
                     <Label
@@ -759,15 +717,14 @@ const OnboardingPage = () => {
                       I agree to the platform commission structure of 10% per
                       sale.
                     </Label>
+                    {errors.agreed_commission && (<p className="text-red-500 text-xs mt-1 w-full block">{errors.agreed_commission.message?.toString()}</p>)}
                   </div>
                   <div className="flex items-start space-x-3">
                     <input
                       type="checkbox"
                       id="agreed_authenticity"
-                      name="agreed_authenticity"
+                      {...register("agreed_authenticity")}
                       className="mt-1 w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
-                      checked={formData.agreed_authenticity}
-                      onChange={handleInputChange}
                       required
                     />
                     <Label
@@ -777,15 +734,14 @@ const OnboardingPage = () => {
                       I certificate that all products listed will be 100%
                       authentic and original.
                     </Label>
+                    {errors.agreed_authenticity && (<p className="text-red-500 text-xs mt-1 w-full block">{errors.agreed_authenticity.message?.toString()}</p>)}
                   </div>
                   <div className="flex items-start space-x-3">
                     <input
                       type="checkbox"
                       id="agreed_return_policy"
-                      name="agreed_return_policy"
+                      {...register("agreed_return_policy")}
                       className="mt-1 w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
-                      checked={formData.agreed_return_policy}
-                      onChange={handleInputChange}
                       required
                     />
                     <Label
@@ -795,6 +751,7 @@ const OnboardingPage = () => {
                       I agree to follow the standard 7-day return policy for
                       customers.
                     </Label>
+                    {errors.agreed_return_policy && (<p className="text-red-500 text-xs mt-1 w-full block">{errors.agreed_return_policy.message?.toString()}</p>)}
                   </div>
                 </div>
 

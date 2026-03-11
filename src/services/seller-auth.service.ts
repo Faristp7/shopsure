@@ -1,5 +1,5 @@
 import { apiService } from "./api";
-import { AuthResponse } from "@/types/auth";
+import { AuthResponse, LoginResponse } from "@/types/auth";
 
 export const sellerAuthService = {
   register: async (data: {
@@ -11,8 +11,8 @@ export const sellerAuthService = {
     return apiService.post("/v1/seller/auth/register", data);
   },
 
-  login: async (data: any) => {
-    return apiService.post<AuthResponse>("/v1/seller/auth/login", data);
+  login: async (data: { email: string; password: string }) => {
+    return apiService.post<LoginResponse>("/v1/seller/auth/login", data);
   },
 
   verifyEmailOtp: async (data: { email: string; otp: string }) => {

@@ -2,17 +2,24 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { decodeJwt } from "jose";
 
+type SellerStatus =
+  | "PENDING_EMAIL_VERIFICATION"
+  | "ONBOARDING_INCOMPLETE"
+  | "PENDING_ADMIN_APPROVAL"
+  | "APPROVED"
+  | "REJECTED";
+
 export function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const token = request.cookies.get("accessToken")?.value;
 
   let userRole: string | null = null;
-  let sellerStatus: string | null = null;
+  let sellerStatus: SellerStatus | null = null;
   if (token) {
     try {
       const decoded = decodeJwt(token);
       userRole = decoded.role as string;
-      sellerStatus = decoded.status as string;
+      sellerStatus = decoded.status as SellerStatus;
     } catch (e) {
       // Invalid token
     }
@@ -39,7 +46,7 @@ export function middleware(request: NextRequest) {
     // 1. Landing page /seller: If already logged in as SELLER -> Redirect to logic
     if (path === "/seller") {
       if (userRole === "SELLER") {
-        if (sellerStatus === "ONBOARDING_INCOMPLETE") {
+        if (sellerStatus === "ONBOARDING_INCOMPLETE" || sellerStatus === "PENDING_ADMIN_APPROVAL") {
           return NextResponse.redirect(new URL("/seller/onboarding", request.url));
         }
         return NextResponse.redirect(new URL("/seller/dashboard", request.url));
@@ -55,6 +62,11 @@ export function middleware(request: NextRequest) {
 
     // 3. User is SELLER. Handle Onboarding routing logic.
     if (sellerStatus === "ONBOARDING_INCOMPLETE") {
+      // If not already on onboarding page, force them to onboarding
+      if (path !== "/seller/onboarding") {
+        return NextResponse.redirect(new URL("/seller/onboarding", request.url));
+      }
+    } else if (sellerStatus === "PENDING_ADMIN_APPROVAL") {
       // If not already on onboarding page, force them to onboarding
       if (path !== "/seller/onboarding") {
         return NextResponse.redirect(new URL("/seller/onboarding", request.url));

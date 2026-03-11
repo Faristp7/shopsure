@@ -16,14 +16,9 @@ import Link from "next/link";
 import { sellerAuthService } from "@/services/seller-auth.service";
 import { useRouter } from "next/navigation";
 
-interface AuthCardProps {
-  onSignup?: () => void;
-  onLogin?: () => void;
-}
-
 const OTP_LENGTH = 6;
 
-const AuthCard = ({ onSignup, onLogin }: AuthCardProps) => {
+const AuthCard = () => {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"signup" | "login">("signup");
   const [showPassword, setShowPassword] = useState(false);
@@ -80,7 +75,7 @@ const AuthCard = ({ onSignup, onLogin }: AuthCardProps) => {
       console.error("Registration failed:", error);
       setAuthError(
         error.response?.data?.message ||
-          "Registration failed. Please try again.",
+        "Registration failed. Please try again.",
       );
     } finally {
       setIsLoading(false);
@@ -101,15 +96,24 @@ const AuthCard = ({ onSignup, onLogin }: AuthCardProps) => {
       // Store tokens in cookies
       document.cookie = `accessToken=${response.accessToken}; path=/; max-age=86400; SameSite=Strict`;
       document.cookie = `refreshToken=${response.refreshToken}; path=/; max-age=604800; SameSite=Strict`;
-      localStorage.setItem("user", JSON.stringify(response.user));
-
-      router.push("/seller/dashboard");
-      onLogin?.();
+      localStorage.setItem("seller", JSON.stringify(response.seller));
+alert(response.redirectTo);
+      if (response.redirectTo === "waiting-approval") {
+        router.push("/seller/onboarding");
+      } else if (response.redirectTo === "onboarding") {
+        router.push("/seller/onboarding");
+      } else if (response.redirectTo === "rejected") {
+        router.push("/seller/onboarding");
+      } else if (response.redirectTo === "verify-email") {
+        router.push("/seller/verify-email");
+      } else {
+        router.push("/seller/dashboard");
+      }
     } catch (error: any) {
       console.error("Login failed:", error);
       setAuthError(
         error.response?.data?.message ||
-          "Login failed. Please check your credentials.",
+        "Login failed. Please check your credentials.",
       );
     } finally {
       setIsLoading(false);
@@ -171,7 +175,6 @@ const AuthCard = ({ onSignup, onLogin }: AuthCardProps) => {
       localStorage.setItem("user", JSON.stringify(response.user));
 
       router.push("/seller/dashboard");
-      onSignup?.();
     } catch (error: any) {
       console.error("OTP Verification failed:", error);
       setOtpError(
@@ -216,11 +219,10 @@ const AuthCard = ({ onSignup, onLogin }: AuthCardProps) => {
                 setActiveTab(tab);
                 setAuthError("");
               }}
-              className={`relative py-4 text-sm font-semibold transition-colors ${
-                activeTab === tab
-                  ? "text-primary bg-accent/50"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`relative py-4 text-sm font-semibold transition-colors ${activeTab === tab
+                ? "text-primary bg-accent/50"
+                : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               {tab === "signup"
                 ? "New Seller? Sign Up"
@@ -331,11 +333,10 @@ const AuthCard = ({ onSignup, onLogin }: AuthCardProps) => {
                 <button
                   onClick={handleResendOtp}
                   disabled={resendTimer > 0}
-                  className={`text-xs font-medium transition-colors ${
-                    resendTimer > 0
-                      ? "text-muted-foreground cursor-not-allowed"
-                      : "text-primary hover:underline"
-                  }`}
+                  className={`text-xs font-medium transition-colors ${resendTimer > 0
+                    ? "text-muted-foreground cursor-not-allowed"
+                    : "text-primary hover:underline"
+                    }`}
                 >
                   {resendTimer > 0 ? `Resend in ${resendTimer}s` : "Resend OTP"}
                 </button>

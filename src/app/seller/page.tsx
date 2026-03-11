@@ -144,10 +144,7 @@ export default function SellerLandingPage() {
               transition={{ duration: 0.7, delay: 0.3, ease: "easeOut" }}
               className="flex flex-col items-center lg:items-end"
             >
-              <AuthCard
-                onSignup={() => router.push("/seller/dashboard")}
-                onLogin={() => router.push("/seller/dashboard")}
-              />
+              <AuthCard />
             </motion.div>
           </div>
         </div>

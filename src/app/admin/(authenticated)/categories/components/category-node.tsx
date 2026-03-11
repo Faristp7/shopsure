@@ -58,7 +58,7 @@ export function CategoryNode({ data, isConnectable }: CategoryNodeProps) {
                 type="source"
                 position={Position.Bottom}
                 isConnectable={isConnectable}
-                className="w-3 h-3 bg-blue-500 border-2 border-white hover:scale-125 transition-transform opacity-0 group-hover:opacity-100"
+                className="w-8 h-8 bg-blue-500 border-2 border-white hover:scale-125 transition-transform opacity-0 group-hover:opacity-100"
             />
         </div>
     );

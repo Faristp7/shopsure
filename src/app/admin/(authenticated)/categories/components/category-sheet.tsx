@@ -195,7 +195,7 @@ export function CategorySheet({ open, onOpenChange, category, onSave }: Category
     const handleFile = async (file: File) => {
         try {
             setIsUploading(true);
-            const response = await mediaService.uploadLogo(file);
+            const response = await mediaService.adminUpload(file, 'categories');
             form.setValue('imageUrl', response.url, { shouldDirty: true });
             toast.success('Image uploaded successfully.');
         } catch (error) {

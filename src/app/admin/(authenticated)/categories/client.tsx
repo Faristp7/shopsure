@@ -5,7 +5,7 @@ import { Category } from "@/types/category";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Plus, Search, Loader2 } from "lucide-react";
+import { Plus, Search, Loader2, LayoutGrid } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { CategoryNode } from "./components/category-node";
 import { CategorySheet } from "./components/category-sheet";
@@ -34,11 +34,8 @@ const nodeTypes = {
     category: CategoryNode,
 };
 
-const dagreGraph = new dagre.graphlib.Graph();
-dagreGraph.setDefaultEdgeLabel(() => ({}));
-
-const nodeWidth = 260;
-const nodeHeight = 80;
+const NODE_WIDTH = 260;
+const NODE_HEIGHT = 80;
 
 /* ------------------------------------------------------------------ */
 /* Constants */
@@ -60,35 +57,43 @@ const startNode: Node = {
 };
 
 const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'TB') => {
+    const g = new dagre.graphlib.Graph();
+    g.setDefaultEdgeLabel(() => ({}));
+
     const isHorizontal = direction === 'LR';
-    dagreGraph.setGraph({ rankdir: direction });
+    g.setGraph({
+        rankdir: direction,
+        nodesep: 40,
+        ranksep: 80,
+        marginx: 20,
+        marginy: 20,
+    });
 
     nodes.forEach((node) => {
-        dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+        g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
     });
 
     edges.forEach((edge) => {
-        dagreGraph.setEdge(edge.source, edge.target);
+        g.setEdge(edge.source, edge.target);
     });
 
-    dagre.layout(dagreGraph);
+    dagre.layout(g);
 
-    nodes.forEach((node) => {
-        const nodeWithPosition = dagreGraph.node(node.id);
-        node.targetPosition = isHorizontal ? Position.Left : Position.Top;
-        node.sourcePosition = isHorizontal ? Position.Right : Position.Bottom;
-
-        // We are shifting the dagre node position (anchor=center center) to the top left
-        // so it matches the React Flow node anchor point (top left).
-        node.position = {
-            x: nodeWithPosition.x - nodeWidth / 2,
-            y: nodeWithPosition.y - nodeHeight / 2 + (Math.random() * 0.01), // Slight randomness to prevent React Flow jitter
+    const layoutedNodes = nodes.map((node) => {
+        const pos = g.node(node.id);
+        return {
+            ...node,
+            targetPosition: isHorizontal ? Position.Left : Position.Top,
+            sourcePosition: isHorizontal ? Position.Right : Position.Bottom,
+            // Shift dagre center-anchor to React Flow top-left anchor
+            position: {
+                x: pos.x - NODE_WIDTH / 2,
+                y: pos.y - NODE_HEIGHT / 2,
+            },
         };
-
-        return node;
     });
 
-    return { nodes, edges };
+    return { nodes: layoutedNodes, edges };
 };
 
 export default function CategoriesClient() {
@@ -100,6 +105,7 @@ export default function CategoriesClient() {
     /* ------------------------ Flow State ------------------------ */
     const [nodes, setNodes, onNodesChange] = useNodesState<Node>([startNode]);
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+    const [layoutDirection, setLayoutDirection] = useState<'TB' | 'LR'>('TB');
 
     /* ------------------------ Side Sheet ------------------------ */
     const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -232,7 +238,7 @@ export default function CategoriesClient() {
             source: cat.parentId ?? ROOT_NODE_ID,
             target: cat.id,
             type: 'smoothstep',
-            animated: true,
+            animated: false,
             style: { stroke: '#94a3b8', strokeWidth: 2 },
             markerEnd: {
                 type: MarkerType.ArrowClosed,
@@ -241,11 +247,11 @@ export default function CategoriesClient() {
         }));
 
         const { nodes: layoutedNodes, edges: layoutedEdges } =
-            getLayoutedElements([startNode, ...categoryNodes], categoryEdges);
+            getLayoutedElements([startNode, ...categoryNodes], categoryEdges, layoutDirection);
 
         setNodes(layoutedNodes);
         setEdges(layoutedEdges);
-    }, [filteredCategories, onEditCategory, onCreateNew, setNodes, setEdges]);
+    }, [filteredCategories, onEditCategory, onCreateNew, setNodes, setEdges, layoutDirection]);
 
     /* ------------------------------------------------------------------ */
     /* Connect Existing Categories */
@@ -313,14 +319,25 @@ export default function CategoriesClient() {
                     </p>
                 </div>
 
-                <div className="relative w-[260px]">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Search category..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="pl-9"
-                    />
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setLayoutDirection((d) => (d === 'TB' ? 'LR' : 'TB'))}
+                        title={layoutDirection === 'TB' ? 'Switch to horizontal layout' : 'Switch to vertical layout'}
+                    >
+                        <LayoutGrid className="h-4 w-4 mr-1.5" />
+                        {layoutDirection === 'TB' ? 'Vertical' : 'Horizontal'}
+                    </Button>
+                    <div className="relative w-[260px]">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search category..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="pl-9"
+                        />
+                    </div>
                 </div>
             </div>
 

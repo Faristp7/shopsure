@@ -21,4 +21,20 @@ export const mediaService = {
       },
     );
   },
+
+  adminUpload: async (file: File, folder: string = "categories") => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("folder", folder);
+
+    return apiService.post<UploadMediaResponse>(
+      "/v1/admin/files/upload",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      },
+    );
+  },
 };

@@ -142,7 +142,7 @@ export default function SellerLandingPage() {
               initial={{ opacity: 0, x: 40 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.7, delay: 0.3, ease: "easeOut" }}
-              className="flex flex-col items-center lg:items-end"
+              className="flex flex-col items-center lg:items-end lg:min-h-[70vh]"
             >
               <AuthCard />
             </motion.div>

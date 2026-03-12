@@ -22,6 +22,14 @@ export function PWASetup() {
             });
         }
 
+        const hasDismissed = typeof window !== 'undefined'
+            ? window.localStorage.getItem('pwaPromptDismissed') === 'true'
+            : false;
+
+        if (hasDismissed) {
+            return;
+        }
+
         const handleBeforeInstallPrompt = (e: any) => {
             // Prevent the mini-infobar from appearing on mobile
             e.preventDefault();
@@ -58,6 +66,13 @@ export function PWASetup() {
         setShowPrompt(false);
     };
 
+    const handleClose = () => {
+        if (typeof window !== 'undefined') {
+            window.localStorage.setItem('pwaPromptDismissed', 'true');
+        }
+        setShowPrompt(false);
+    };
+
     if (!showPrompt) return null;
 
     return (
@@ -67,7 +82,7 @@ export function PWASetup() {
                     <h3 className="font-semibold text-sm">Install ShopSure</h3>
                     <p className="text-xs text-muted-foreground mt-1">Add to your home screen for a better experience.</p>
                 </div>
-                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setShowPrompt(false)}>
+                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleClose}>
                     <X className="h-4 w-4" />
                 </Button>
             </div>

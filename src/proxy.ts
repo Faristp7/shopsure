@@ -9,7 +9,7 @@ type SellerStatus =
   | "APPROVED"
   | "REJECTED";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const token = request.cookies.get("accessToken")?.value;
 
@@ -28,10 +28,11 @@ export function middleware(request: NextRequest) {
   // Admin Route Protection
   if (path.startsWith("/admin")) {
     // 1. If trying to access login page AND already logged in as ADMIN -> Redirect to Dashboard
-    if (path === "/admin/auth") {
+    if (path === "/admin" || path === "/admin/auth") {
       if (userRole === "ADMIN") {
         return NextResponse.redirect(new URL("/admin/dashboard", request.url));
       }
+      // return NextResponse.redirect(new URL("/admin/auth", request.url));
       return NextResponse.next();
     }
 
@@ -83,5 +84,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/seller/:path*"],
+  matcher: ["/admin", "/admin/:path*", "/seller", "/seller/:path*"],
 };

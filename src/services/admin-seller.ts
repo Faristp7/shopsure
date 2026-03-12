@@ -1,6 +1,11 @@
 import { apiService } from './api';
 import { ListSellersQuery, ListSellersResponse } from '@/types/seller';
 
+interface ReviewSellerPayload {
+    decision: 'approve' | 'reject';
+    rejectionReason?: string | null;
+}
+
 export const adminSellerService = {
     getSellers: async (params?: ListSellersQuery) => {
         const searchParams = new URLSearchParams();
@@ -17,5 +22,8 @@ export const adminSellerService = {
     },
     getSellerById: async (id: string) => {
         return apiService.get<import('@/types/seller').SellerDetail>(`v1/admin/sellers/${id}`);
+    },
+    reviewSeller: async (id: string, payload: ReviewSellerPayload) => {
+        return apiService.patch<void>(`v1/admin/sellers/${id}/review`, payload);
     },
 };

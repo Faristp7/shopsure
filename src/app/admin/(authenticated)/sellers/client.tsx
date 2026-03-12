@@ -1,7 +1,11 @@
 'use client';
 
-import { Skeleton } from "@/components/ui/skeleton"
 import { useState } from "react"
+import { format } from "date-fns"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
+
+import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
 import {
     Select,
@@ -30,18 +34,24 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Shield, Ban, CheckCircle } from "lucide-react"
-import { useQuery } from "@tanstack/react-query"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { MoreHorizontal, Ban, CheckCircle } from "lucide-react"
 import { adminSellerService } from "@/services/admin-seller"
 import { SellerStatus } from "@/types/seller"
-import { format } from "date-fns"
 import { SellerDetailsModal } from "./seller-details-modal"
+
+type ReviewDecision = 'approve' | 'reject';
 
 export default function SellersClient() {
     const [search, setSearch] = useState("");
     const [status, setStatus] = useState<SellerStatus | 'ALL'>(SellerStatus.PENDING_ADMIN_APPROVAL);
     const [selectedSellerId, setSelectedSellerId] = useState<string | null>(null);
+    const [suspendSeller, setSuspendSeller] = useState<{ id: string; name: string } | null>(null);
+    const [suspendReason, setSuspendReason] = useState("");
+
     const debouncedSearch = useDebounce(search, 500);
+    const queryClient = useQueryClient();
 
     const { data, isLoading, isError } = useQuery({
         queryKey: ['admin-sellers', status, debouncedSearch],
@@ -51,9 +61,58 @@ export default function SellersClient() {
         }),
     });
 
+    const reviewMutation = useMutation({
+        mutationFn: async (params: { id: string; decision: ReviewDecision; rejectionReason?: string }) => {
+            const { id, decision, rejectionReason } = params;
+            return adminSellerService.reviewSeller(id, {
+                decision,
+                rejectionReason: decision === 'approve' ? null : (rejectionReason ?? null),
+            });
+        },
+        onSuccess: async (_data, variables) => {
+            await queryClient.invalidateQueries({ queryKey: ['admin-sellers'] });
+
+            if (variables.decision === 'approve') {
+                toast.success("Seller approved successfully");
+            } else {
+                toast.success("Seller suspended successfully");
+            }
+        },
+        onError: () => {
+            toast.error("Failed to update seller status. Please try again.");
+        },
+    });
+
     const sellers = data?.items || [];
 
     if (isError) return <div>Error loading sellers.</div>;
+
+    const handleApprove = (id: string) => {
+        reviewMutation.mutate({ id, decision: 'approve' });
+    };
+
+    const handleOpenSuspend = (id: string, name: string) => {
+        setSuspendSeller({ id, name });
+        setSuspendReason("");
+    };
+
+    const handleConfirmSuspend = () => {
+        if (!suspendSeller) return;
+
+        reviewMutation.mutate(
+            {
+                id: suspendSeller.id,
+                decision: 'reject',
+                rejectionReason: suspendReason,
+            },
+            {
+                onSuccess: () => {
+                    setSuspendSeller(null);
+                    setSuspendReason("");
+                },
+            }
+        );
+    };
 
     return (
         <div className="space-y-6">
@@ -153,10 +212,20 @@ export default function SellersClient() {
                                                     View Details
                                                 </DropdownMenuItem>
                                                 <DropdownMenuSeparator />
-                                                <DropdownMenuItem className="text-green-600">
+                                                {seller.status === SellerStatus.PENDING_ADMIN_APPROVAL && (
+                                                <DropdownMenuItem
+                                                    className="text-green-600"
+                                                    onClick={() => handleApprove(seller.id)}
+                                                    disabled={reviewMutation.isPending}
+                                                >
                                                     <CheckCircle className="mr-2 h-4 w-4" /> Approve
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem className="text-destructive">
+                                                )}
+                                                <DropdownMenuItem
+                                                    className="text-destructive"
+                                                    onClick={() => handleOpenSuspend(seller.id, seller.name)}
+                                                    disabled={reviewMutation.isPending}
+                                                >
                                                     <Ban className="mr-2 h-4 w-4" /> Suspend
                                                 </DropdownMenuItem>
                                             </DropdownMenuContent>
@@ -174,6 +243,59 @@ export default function SellersClient() {
                 isOpen={!!selectedSellerId}
                 onClose={() => setSelectedSellerId(null)}
             />
+
+            <Dialog
+                open={!!suspendSeller}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setSuspendSeller(null);
+                        setSuspendReason("");
+                    }
+                }}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Suspend seller</DialogTitle>
+                        <DialogDescription>
+                            {suspendSeller
+                                ? `Please provide a reason for suspending ${suspendSeller.name}. This will be stored with their account.`
+                                : "Please provide a reason for suspending this seller."}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-3 pt-2">
+                        <label className="text-sm font-medium">
+                            Reason for suspension
+                        </label>
+                        <Textarea
+                            value={suspendReason}
+                            onChange={(e) => setSuspendReason(e.target.value)}
+                            placeholder="Enter the reason (e.g. GST details are invalid)"
+                            rows={4}
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-4">
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setSuspendSeller(null);
+                                setSuspendReason("");
+                            }}
+                            disabled={reviewMutation.isPending}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleConfirmSuspend}
+                            disabled={reviewMutation.isPending}
+                        >
+                            {reviewMutation.isPending ? "Suspending..." : "Suspend seller"}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

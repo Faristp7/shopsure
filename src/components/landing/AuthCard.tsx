@@ -97,7 +97,7 @@ const AuthCard = () => {
       document.cookie = `accessToken=${response.accessToken}; path=/; max-age=86400; SameSite=Strict`;
       document.cookie = `refreshToken=${response.refreshToken}; path=/; max-age=604800; SameSite=Strict`;
       localStorage.setItem("seller", JSON.stringify(response.seller));
-alert(response.redirectTo);
+
       if (response.redirectTo === "waiting-approval") {
         router.push("/seller/onboarding");
       } else if (response.redirectTo === "onboarding") {

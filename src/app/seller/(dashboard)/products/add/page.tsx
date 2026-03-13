@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -25,21 +25,11 @@ import {
   Sparkles,
   GripVertical,
   ChevronDown,
-  Check,
+  Hash,
 } from "lucide-react";
-
-const categories = [
-  "Women's Clothing",
-  "Men's Clothing",
-  "Jewellery",
-  "Accessories",
-  "Footwear",
-  "Home & Decor",
-  "Beauty & Skincare",
-  "Bags & Wallets",
-  "Kids' Wear",
-  "Other",
-];
+import { useProductForm } from "@/hooks/useProductForm";
+import CategorySelector from "@/components/seller/CategorySelector";
+import TagInput from "@/components/seller/TagInput";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -60,74 +50,67 @@ const scaleIn = {
   exit: { opacity: 0, scale: 0.8, transition: { duration: 0.2 } },
 };
 
-interface Variant {
-  id: string;
-  type: string;
-  value: string;
-  stock: string;
-  price: string;
-}
+const sections = [
+  { icon: ImagePlus, label: "Images" },
+  { icon: Package, label: "Details" },
+  { icon: IndianRupee, label: "Pricing" },
+  { icon: Layers, label: "Variants" },
+  { icon: Weight, label: "Shipping" },
+];
 
 export default function AddProductPage() {
   const router = useRouter();
-  const [images, setImages] = useState<string[]>([]);
-  const [hasDiscount, setHasDiscount] = useState(false);
-  const [hasVariants, setHasVariants] = useState(false);
-  const [categoryOpen, setCategoryOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [variants, setVariants] = useState<Variant[]>([
-    { id: "1", type: "Size", value: "", stock: "", price: "" },
-  ]);
-  const [dragOver, setDragOver] = useState(false);
-  const [activeSection, setActiveSection] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const addMockImage = () => {
-    const placeholders = [
-      "📸 Product Front",
-      "📷 Product Back",
-      "🖼️ Close-up Detail",
-      "📱 Lifestyle Shot",
-      "🎨 Color Variant",
-      "📦 Packaging",
-    ];
-    if (images.length < 6) {
-      setImages([...images, placeholders[images.length] || "📸 New Image"]);
+  const {
+    form,
+    errors,
+    isSubmitting,
+    discount,
+    setField,
+    setShippingField,
+    addImages,
+    removeImage,
+    addTag,
+    removeTag,
+    addVariant,
+    removeVariant,
+    updateVariant,
+    handleSubmit,
+  } = useProductForm();
+
+  const activeSection = 0; // Keep scroll-based section highlight simple
+
+  const handleFileSelect = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFilesChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      addImages(e.target.files);
+      e.target.value = ""; // Reset so same file can be re-selected
     }
   };
 
-  const removeImage = (index: number) => {
-    setImages(images.filter((_, i) => i !== index));
-  };
-
-  const addVariant = () => {
-    setVariants([
-      ...variants,
-      {
-        id: Date.now().toString(),
-        type: "Size",
-        value: "",
-        stock: "",
-        price: "",
-      },
-    ]);
-  };
-
-  const removeVariant = (id: string) => {
-    if (variants.length > 1) {
-      setVariants(variants.filter((v) => v.id !== id));
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      addImages(e.dataTransfer.files);
     }
   };
-
-  const sections = [
-    { icon: ImagePlus, label: "Images" },
-    { icon: Package, label: "Details" },
-    { icon: IndianRupee, label: "Pricing" },
-    { icon: Layers, label: "Variants" },
-    { icon: Weight, label: "Shipping" },
-  ];
 
   return (
     <div className="max-w-4xl mx-auto pb-24 animate-fade-in relative">
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={handleFilesChosen}
+      />
+
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
@@ -163,7 +146,6 @@ export default function AddProductPage() {
           <button
             key={i}
             onClick={() => {
-              setActiveSection(i);
               document
                 .getElementById(`section-${i}`)
                 ?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -189,7 +171,6 @@ export default function AddProductPage() {
           initial="hidden"
           animate="visible"
           className="bg-card border border-border rounded-2xl p-6 shadow-sm overflow-hidden"
-          onViewportEnter={() => setActiveSection(0)}
         >
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/5 shadow-inner">
@@ -203,29 +184,38 @@ export default function AddProductPage() {
             </div>
           </div>
 
+          {errors.images && (
+            <p className="text-[11px] text-destructive font-medium mb-3 ml-1">
+              {errors.images}
+            </p>
+          )}
+
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
             <AnimatePresence mode="popLayout">
-              {images.map((img, i) => (
+              {form.images.map((img, i) => (
                 <motion.div
-                  key={i}
+                  key={img.id}
                   variants={scaleIn}
                   initial="hidden"
                   animate="visible"
                   exit="exit"
                   layout
-                  className="relative aspect-square rounded-xl bg-muted border-2 border-border flex items-center justify-center group cursor-grab shadow-inner"
+                  className="relative aspect-square rounded-xl bg-muted border-2 border-border flex items-center justify-center group cursor-grab shadow-inner overflow-hidden"
                 >
-                  <span className="text-2xl">{img.split(" ")[0]}</span>
-                  <p className="absolute bottom-1.5 text-[9px] text-muted-foreground font-bold px-1 text-center leading-tight uppercase tracking-tighter">
-                    {img.split(" ").slice(1).join(" ")}
-                  </p>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={img.preview}
+                    alt={`Product image ${i + 1}`}
+                    className="w-full h-full object-cover"
+                  />
                   {i === 0 && (
                     <span className="absolute top-1 left-1 bg-primary text-primary-foreground text-[8px] font-extrabold px-1.5 py-0.5 rounded-md shadow-sm">
                       COVER
                     </span>
                   )}
                   <button
-                    onClick={() => removeImage(i)}
+                    type="button"
+                    onClick={() => removeImage(img.id)}
                     className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:scale-110 shadow-md border border-background"
                   >
                     <X className="h-3 w-3" />
@@ -234,26 +224,15 @@ export default function AddProductPage() {
               ))}
             </AnimatePresence>
 
-            {images.length < 6 && (
+            {form.images.length < 6 && (
               <motion.button
+                type="button"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={addMockImage}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragOver(true);
-                }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragOver(false);
-                  addMockImage();
-                }}
-                className={`aspect-square rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1 transition-all duration-300 ${
-                  dragOver
-                    ? "border-primary bg-primary/10 scale-102 ring-4 ring-primary/5"
-                    : "border-border hover:border-primary/40 hover:bg-muted/30"
-                }`}
+                onClick={handleFileSelect}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleDrop}
+                className="aspect-square rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1 transition-all duration-300 border-border hover:border-primary/40 hover:bg-muted/30"
               >
                 <Upload className="h-5 w-5 text-muted-foreground" />
                 <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
@@ -272,7 +251,6 @@ export default function AddProductPage() {
           initial="hidden"
           animate="visible"
           className="bg-card border border-border rounded-2xl p-6 shadow-sm"
-          onViewportEnter={() => setActiveSection(1)}
         >
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/5 shadow-inner">
@@ -289,6 +267,7 @@ export default function AddProductPage() {
           </div>
 
           <div className="space-y-6">
+            {/* Title */}
             <div className="space-y-2">
               <Label
                 htmlFor="title"
@@ -299,14 +278,24 @@ export default function AddProductPage() {
               <Input
                 id="title"
                 placeholder="e.g. Handcrafted Blue Anarkali Set — Free Size"
-                className="h-12 text-base font-semibold border-border/60 focus-visible:ring-primary/20"
+                className={`h-12 text-base font-semibold focus-visible:ring-primary/20 ${
+                  errors.title ? "border-destructive" : "border-border/60"
+                }`}
+                value={form.title}
+                onChange={(e) => setField("title", e.target.value)}
               />
+              {errors.title && (
+                <p className="text-[11px] text-destructive font-medium ml-1">
+                  {errors.title}
+                </p>
+              )}
               <p className="text-[10px] text-muted-foreground/80 mt-1.5 flex items-center gap-1 font-medium italic">
                 <Sparkles className="h-3 w-3 text-primary/60" /> Tip: Include
                 material, color, and size info for better search visibility
               </p>
             </div>
 
+            {/* Description */}
             <div className="space-y-2">
               <Label
                 htmlFor="description"
@@ -317,76 +306,94 @@ export default function AddProductPage() {
               <Textarea
                 id="description"
                 placeholder="Describe your product in detail — material, fit, care instructions, what makes it special..."
-                className="min-h-[140px] text-sm leading-relaxed resize-none border-border/60 focus-visible:ring-primary/20"
+                className={`min-h-[140px] text-sm leading-relaxed resize-none focus-visible:ring-primary/20 ${
+                  errors.description ? "border-destructive" : "border-border/60"
+                }`}
+                value={form.description}
+                onChange={(e) => setField("description", e.target.value)}
               />
+              {errors.description && (
+                <p className="text-[11px] text-destructive font-medium ml-1">
+                  {errors.description}
+                </p>
+              )}
               <div className="flex justify-between mt-1.5">
                 <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-tight">
                   Write at least 100 characters
                 </p>
                 <p className="text-[10px] text-muted-foreground font-bold">
-                  0 / 2000
+                  {form.description.length} / 2000
                 </p>
               </div>
             </div>
 
             {/* Category */}
-            <div className="relative space-y-2">
+            <div className="space-y-2">
               <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">
                 Category
               </Label>
-              <button
-                onClick={() => setCategoryOpen(!categoryOpen)}
-                className="w-full h-11 px-4 border border-border/60 rounded-lg bg-background text-sm flex items-center justify-between hover:border-primary/40 hover:bg-muted/10 transition-all font-medium"
+              <CategorySelector
+                value={form.categoryId}
+                displayName={form.categoryDisplayName}
+                onChange={(id, name) => {
+                  setField("categoryId", id);
+                  setField("categoryDisplayName", name);
+                }}
+                error={errors.categoryId}
+              />
+            </div>
+
+            {/* Brand */}
+            <div className="space-y-2">
+              <Label
+                htmlFor="brand"
+                className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1"
               >
-                <span
-                  className={
-                    selectedCategory
-                      ? "text-foreground font-bold"
-                      : "text-muted-foreground"
-                  }
-                >
-                  {selectedCategory || "Select a category"}
-                </span>
-                <motion.div
-                  animate={{ rotate: categoryOpen ? 180 : 0 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                </motion.div>
-              </button>
-              <AnimatePresence>
-                {categoryOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -5, scaleY: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scaleY: 1 }}
-                    exit={{ opacity: 0, y: -5, scaleY: 0.95 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute z-20 mt-1 w-full bg-card border border-border rounded-xl shadow-2xl overflow-hidden origin-top"
-                  >
-                    <div className="max-h-64 overflow-y-auto no-scrollbar">
-                      {categories.map((cat) => (
-                        <button
-                          key={cat}
-                          onClick={() => {
-                            setSelectedCategory(cat);
-                            setCategoryOpen(false);
-                          }}
-                          className={`w-full text-left px-4 py-3 text-sm transition-colors flex items-center justify-between ${
-                            selectedCategory === cat
-                              ? "bg-primary/10 text-primary font-bold"
-                              : "hover:bg-muted text-foreground font-medium"
-                          }`}
-                        >
-                          {cat}
-                          {selectedCategory === cat && (
-                            <Check className="h-4 w-4 text-primary" />
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                Brand <span className="text-muted-foreground/50">(Optional)</span>
+              </Label>
+              <Input
+                id="brand"
+                placeholder="e.g. FabIndia, Levi's, Custom Brand"
+                className="h-11 font-semibold border-border/60 focus-visible:ring-primary/20"
+                value={form.brand}
+                onChange={(e) => setField("brand", e.target.value)}
+              />
+            </div>
+
+            {/* SKU */}
+            <div className="space-y-2">
+              <Label
+                htmlFor="sku"
+                className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1"
+              >
+                SKU <span className="text-muted-foreground/50">(Auto-generated if empty)</span>
+              </Label>
+              <div className="relative">
+                <Hash className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40" />
+                <Input
+                  id="sku"
+                  placeholder="e.g. SKU-12345 or leave blank"
+                  className="h-11 pl-10 font-semibold border-border/60 focus-visible:ring-primary/20"
+                  value={form.sku}
+                  onChange={(e) => setField("sku", e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Tags */}
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">
+                Tags
+              </Label>
+              <TagInput
+                tags={form.tags}
+                onAdd={addTag}
+                onRemove={removeTag}
+                placeholder="e.g. cotton, casual, festive — press Enter to add"
+              />
+              <p className="text-[10px] text-muted-foreground/80 font-medium italic ml-1">
+                Tags help buyers find your product through search
+              </p>
             </div>
           </div>
         </motion.div>
@@ -399,7 +406,6 @@ export default function AddProductPage() {
           initial="hidden"
           animate="visible"
           className="bg-card border border-border rounded-2xl p-6 shadow-sm"
-          onViewportEnter={() => setActiveSection(2)}
         >
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/5 shadow-inner">
@@ -427,9 +433,21 @@ export default function AddProductPage() {
                   </span>
                   <Input
                     placeholder="1,499"
-                    className="pl-10 h-12 text-xl font-extrabold border-border/60 focus-visible:ring-primary/20"
+                    type="number"
+                    className={`pl-10 h-12 text-xl font-extrabold focus-visible:ring-primary/20 ${
+                      errors.sellingPrice
+                        ? "border-destructive"
+                        : "border-border/60"
+                    }`}
+                    value={form.sellingPrice}
+                    onChange={(e) => setField("sellingPrice", e.target.value)}
                   />
                 </div>
+                {errors.sellingPrice && (
+                  <p className="text-[11px] text-destructive font-medium ml-1">
+                    {errors.sellingPrice}
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">
@@ -438,11 +456,21 @@ export default function AddProductPage() {
                 <Input
                   placeholder="e.g. 25"
                   type="number"
-                  className="h-12 text-xl font-extrabold border-border/60 focus-visible:ring-primary/20"
+                  className={`h-12 text-xl font-extrabold focus-visible:ring-primary/20 ${
+                    errors.stock ? "border-destructive" : "border-border/60"
+                  }`}
+                  value={form.stock}
+                  onChange={(e) => setField("stock", e.target.value)}
                 />
+                {errors.stock && (
+                  <p className="text-[11px] text-destructive font-medium ml-1">
+                    {errors.stock}
+                  </p>
+                )}
               </div>
             </div>
 
+            {/* Discount toggle */}
             <div className="flex items-center justify-between p-4 rounded-xl bg-accent/30 border border-accent/20 shadow-inner">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-background flex items-center justify-center shadow-sm">
@@ -457,11 +485,16 @@ export default function AddProductPage() {
                   </p>
                 </div>
               </div>
-              <Switch checked={hasDiscount} onCheckedChange={setHasDiscount} />
+              <Switch
+                checked={!!form.originalPrice}
+                onCheckedChange={(checked) => {
+                  if (!checked) setField("originalPrice", "");
+                }}
+              />
             </div>
 
             <AnimatePresence>
-              {hasDiscount && (
+              {(!!form.originalPrice || form.originalPrice === "") && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
@@ -480,7 +513,12 @@ export default function AddProductPage() {
                         </span>
                         <Input
                           placeholder="2,499"
+                          type="number"
                           className="pl-10 h-11 line-through text-muted-foreground font-semibold border-border/60"
+                          value={form.originalPrice}
+                          onChange={(e) =>
+                            setField("originalPrice", e.target.value)
+                          }
                         />
                       </div>
                     </div>
@@ -490,7 +528,7 @@ export default function AddProductPage() {
                       </Label>
                       <div className="h-11 px-4 border border-success/30 rounded-lg bg-success/10 flex items-center shadow-inner">
                         <span className="text-success font-extrabold text-base tracking-tight uppercase">
-                          40% OFF
+                          {discount ? `${discount}% OFF` : "—"}
                         </span>
                       </div>
                     </div>
@@ -509,7 +547,6 @@ export default function AddProductPage() {
           initial="hidden"
           animate="visible"
           className="bg-card border border-border rounded-2xl p-6 shadow-sm"
-          onViewportEnter={() => setActiveSection(3)}
         >
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
@@ -525,11 +562,14 @@ export default function AddProductPage() {
                 </p>
               </div>
             </div>
-            <Switch checked={hasVariants} onCheckedChange={setHasVariants} />
+            <Switch
+              checked={form.hasVariants}
+              onCheckedChange={(checked) => setField("hasVariants", checked)}
+            />
           </div>
 
           <AnimatePresence>
-            {hasVariants && (
+            {form.hasVariants && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
@@ -539,7 +579,7 @@ export default function AddProductPage() {
               >
                 <div className="space-y-3">
                   <AnimatePresence mode="popLayout">
-                    {variants.map((variant, i) => (
+                    {form.variants.map((variant) => (
                       <motion.div
                         key={variant.id}
                         layout
@@ -556,7 +596,13 @@ export default function AddProductPage() {
                             <Label className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
                               Type
                             </Label>
-                            <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm font-bold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                            <select
+                              value={variant.type}
+                              onChange={(e) =>
+                                updateVariant(variant.id, "type", e.target.value)
+                              }
+                              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm font-bold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            >
                               <option>Size</option>
                               <option>Color</option>
                               <option>Material</option>
@@ -570,6 +616,14 @@ export default function AddProductPage() {
                             <Input
                               placeholder="e.g. XL, Red"
                               className="h-9 font-bold"
+                              value={variant.value}
+                              onChange={(e) =>
+                                updateVariant(
+                                  variant.id,
+                                  "value",
+                                  e.target.value,
+                                )
+                              }
                             />
                           </div>
                           <div className="space-y-1.5">
@@ -580,6 +634,14 @@ export default function AddProductPage() {
                               placeholder="10"
                               type="number"
                               className="h-9 font-bold"
+                              value={variant.stock}
+                              onChange={(e) =>
+                                updateVariant(
+                                  variant.id,
+                                  "stock",
+                                  e.target.value,
+                                )
+                              }
                             />
                           </div>
                           <div className="space-y-1.5">
@@ -588,11 +650,21 @@ export default function AddProductPage() {
                             </Label>
                             <Input
                               placeholder="1,499"
+                              type="number"
                               className="h-9 font-bold"
+                              value={variant.price}
+                              onChange={(e) =>
+                                updateVariant(
+                                  variant.id,
+                                  "price",
+                                  e.target.value,
+                                )
+                              }
                             />
                           </div>
                         </div>
                         <button
+                          type="button"
                           onClick={() => removeVariant(variant.id)}
                           className="mt-6 p-1.5 hover:bg-destructive/10 rounded-lg text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"
                         >
@@ -603,6 +675,7 @@ export default function AddProductPage() {
                   </AnimatePresence>
 
                   <motion.button
+                    type="button"
                     whileHover={{ scale: 1.01 }}
                     whileTap={{ scale: 0.99 }}
                     onClick={addVariant}
@@ -624,7 +697,6 @@ export default function AddProductPage() {
           initial="hidden"
           animate="visible"
           className="bg-card border border-border rounded-2xl p-6 shadow-sm"
-          onViewportEnter={() => setActiveSection(4)}
         >
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/5 shadow-inner">
@@ -647,6 +719,8 @@ export default function AddProductPage() {
                 placeholder="e.g. 500"
                 type="number"
                 className="h-11 font-bold border-border/60"
+                value={form.shipping.weight}
+                onChange={(e) => setShippingField("weight", e.target.value)}
               />
             </div>
             <div className="space-y-2">
@@ -657,20 +731,28 @@ export default function AddProductPage() {
                 <div className="relative">
                   <Input
                     placeholder="L"
+                    type="number"
                     className="h-11 text-center font-bold border-border/60 pr-1 pl-1"
+                    value={form.shipping.length}
+                    onChange={(e) => setShippingField("length", e.target.value)}
                   />
-                  {/* <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] opacity-30">cm</span> */}
                 </div>
                 <div className="relative">
                   <Input
                     placeholder="W"
+                    type="number"
                     className="h-11 text-center font-bold border-border/60"
+                    value={form.shipping.width}
+                    onChange={(e) => setShippingField("width", e.target.value)}
                   />
                 </div>
                 <div className="relative">
                   <Input
                     placeholder="H"
+                    type="number"
                     className="h-11 text-center font-bold border-border/60"
+                    value={form.shipping.height}
+                    onChange={(e) => setShippingField("height", e.target.value)}
                   />
                 </div>
               </div>
@@ -695,6 +777,7 @@ export default function AddProductPage() {
               variant="outline"
               className="flex-1 sm:flex-initial h-11 font-bold border-border/60 hover:bg-muted/50 rounded-xl"
               onClick={() => router.push("/seller/products")}
+              disabled={isSubmitting}
             >
               <Save className="h-4 w-4 mr-2" /> Save Draft
             </Button>
@@ -703,8 +786,40 @@ export default function AddProductPage() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              <Button className="w-full h-11 font-extrabold shadow-lg shadow-primary/20 rounded-xl px-8 uppercase tracking-widest text-xs">
-                <Send className="h-4 w-4 mr-2" /> Publish Now
+              <Button
+                className="w-full h-11 font-extrabold shadow-lg shadow-primary/20 rounded-xl px-8 uppercase tracking-widest text-xs"
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <svg
+                      className="animate-spin h-4 w-4 mr-2"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                      />
+                    </svg>
+                    Publishing...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" /> Publish Now
+                  </>
+                )}
               </Button>
             </motion.div>
           </div>

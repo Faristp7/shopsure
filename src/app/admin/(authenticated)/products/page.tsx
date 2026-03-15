@@ -6,26 +6,14 @@ import AdminProductsClient from './client';
 export default async function AdminProductsPage() {
   const queryClient = getQueryClient();
 
-  await Promise.all([
-    queryClient.prefetchQuery({
-      queryKey: ['admin-products', { status: 'PENDING', page: 1, limit: 50 }],
-      queryFn: () =>
-        adminProductService.listProducts({
-          page: 1,
-          limit: 50,
-          status: 'PENDING',
-        }),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ['admin-products', { status: 'PENDING', page: 1, limit: 1 }],
-      queryFn: () =>
-        adminProductService.listProducts({
-          page: 1,
-          limit: 1,
-          status: 'PENDING',
-        }),
-    }),
-  ]);
+  await queryClient.prefetchQuery({
+    queryKey: ['admin-products', { page: 1, limit: 10 }],
+    queryFn: () =>
+      adminProductService.listProducts({
+        page: 1,
+        limit: 10,
+      }),
+  });
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>

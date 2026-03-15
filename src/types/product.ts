@@ -89,11 +89,22 @@ export interface AdminProduct extends SellerProduct {
   sellerId?: string;
 }
 
+/** Display status for admin product list filter (All | Active | Disabled by Admin | Out of Stock) */
+export type AdminProductListStatusFilter =
+  | 'ALL'
+  | 'ACTIVE'
+  | 'DISABLED_BY_ADMIN'
+  | 'OUT_OF_STOCK';
+
 export interface ListAdminProductsQuery {
   page?: number;
   limit?: number;
   search?: string;
-  status?: AdminProductModerationStatus | string;
+  status?: AdminProductModerationStatus | AdminProductListStatusFilter | string;
+  categoryId?: string;
+  sellerId?: string;
+  minPrice?: number;
+  maxPrice?: number;
 }
 
 export interface ListAdminProductsMeta {

@@ -44,6 +44,7 @@ export function useProductForm(productId?: string) {
   const [errors, setErrors] = useState<ProductFormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [justCreated, setJustCreated] = useState(false);
+  const [justUpdated, setJustUpdated] = useState(false);
 
   // --- Field setters ---
 
@@ -314,7 +315,26 @@ export function useProductForm(productId?: string) {
       // 2. Auto-generate SKU if empty
       const sku = form.sku.trim() || `SKU-${Date.now()}`;
 
-      // 3. Build payload
+      // 3. Build variants: use seller-defined variants or single default
+      const variants =
+        form.hasVariants && form.variants.length > 0
+          ? form.variants
+              .filter((v) => v.value.trim())
+              .map((v) => ({
+                type: v.type,
+                value: v.value.trim(),
+                stock: Number(v.stock) || 0,
+                price: Number(v.price) || 0,
+              }))
+          : [
+              {
+                type: 'Default',
+                value: 'Default',
+                stock: Number(form.stock),
+                price: Number(form.sellingPrice),
+              },
+            ];
+
       const payload: CreateProductPayload = {
         title: form.title.trim(),
         description: form.description.trim(),
@@ -326,6 +346,7 @@ export function useProductForm(productId?: string) {
         originalPrice: Number(form.originalPrice),
         stock: Number(form.stock),
         images: uploadedImages,
+        variants,
         attributes: form.attributes
           .filter((a) => a.name.trim() && a.value.trim())
           .map((a) => ({
@@ -340,45 +361,25 @@ export function useProductForm(productId?: string) {
         },
       };
 
-      // Build variants payload:
-      // - If seller has defined variants, use them
-      // - Otherwise create a single default variant from main stock/price
-      if (form.hasVariants && form.variants.length > 0) {
-        const validVariants = form.variants.filter((v) => v.value.trim());
-        payload.variants = validVariants.map((v) => ({
-          type: v.type,
-          value: v.value.trim(),
-          stock: Number(v.stock) || 0,
-          price: Number(v.price) || 0,
-        }));
-      } else {
-        payload.variants = [
-          {
-            type: 'Default',
-            value: 'Default',
-            stock: Number(form.stock),
-            price: Number(form.sellingPrice),
-          },
-        ];
-      }
-
       // 4. Create or update product
       if (productId) {
         await sellerProductService.updateProduct(productId, payload);
-        toast.success('Product updated successfully!');
-      } else {
-        await sellerProductService.createProduct(payload);
-        toast.success('Product published successfully!');
-        setJustCreated(true);
+        setJustUpdated(true);
         setTimeout(() => {
           router.push('/seller/products');
-        }, 900);
+        }, 1600);
         return;
       }
-      router.push('/seller/products');
+      await sellerProductService.createProduct(payload);
+      setJustCreated(true);
+      setTimeout(() => {
+        router.push('/seller/products');
+      }, 1600);
+      return;
     } catch (error: any) {
-      const message = error?.response?.data?.message || error?.message || 'Failed to create product';
-      toast.error(typeof message === 'string' ? message : 'Failed to create product');
+      const fallback = productId ? 'Failed to update product' : 'Failed to create product';
+      const message = error?.response?.data?.message || error?.message || fallback;
+      toast.error(typeof message === 'string' ? message : fallback);
     } finally {
       setIsSubmitting(false);
     }
@@ -396,6 +397,7 @@ export function useProductForm(productId?: string) {
     errors,
     isSubmitting,
     justCreated,
+    justUpdated,
     discount,
     setField,
     setShippingField,

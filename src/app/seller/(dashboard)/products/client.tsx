@@ -2,11 +2,20 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { sellerProductService } from '@/services/seller-product.service';
 import type { SellerProduct } from '@/types/product';
 import {
@@ -107,6 +116,7 @@ const filterTabs = [
 
 export default function ProductsClient() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
   const [bulkEditMode, setBulkEditMode] = useState(false);
@@ -115,6 +125,9 @@ export default function ProductsClient() {
   const [overrides, setOverrides] = useState<
     Record<string, Partial<Product>>
   >({});
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deletedProductName, setDeletedProductName] = useState<string | null>(null);
 
   const {
     data,
@@ -245,6 +258,30 @@ export default function ProductsClient() {
     setBulkStockValue('');
     setSelectedIds([]);
     setBulkEditMode(false);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!productToDelete) return;
+    setIsDeleting(true);
+    try {
+      await sellerProductService.deleteProduct(productToDelete.id);
+      const name = productToDelete.name;
+      setProductToDelete(null);
+      await queryClient.invalidateQueries({ queryKey: ['seller-products'] });
+      setDeletedProductName(name);
+      setTimeout(() => setDeletedProductName(null), 3200);
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response
+              ?.data?.message
+          : null;
+      toast.error(
+        typeof message === 'string' ? message : 'Failed to delete product',
+      );
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const errorMessage =
@@ -678,7 +715,11 @@ export default function ProductsClient() {
                           >
                             <Edit className="h-4 w-4 text-muted-foreground" />
                           </button>
-                          <button className="p-1.5 hover:bg-destructive/10 rounded-lg transition-colors">
+                          <button
+                            onClick={() => setProductToDelete(product)}
+                            className="p-1.5 hover:bg-destructive/10 rounded-lg transition-colors"
+                            title="Delete product"
+                          >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </button>
                         </div>
@@ -691,6 +732,94 @@ export default function ProductsClient() {
           </table>
         </div>
       </div>
+
+      {/* Delete product confirmation dialog */}
+      <Dialog
+        open={!!productToDelete}
+        onOpenChange={(open) => !open && setProductToDelete(null)}
+      >
+        <DialogContent showCloseButton={true}>
+          <DialogHeader>
+            <DialogTitle>Delete product</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &quot;{productToDelete?.name}&quot;?
+              This will soft-delete the product and it will no longer appear in
+              your catalog. You can contact support if you need to restore it.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter showCloseButton={false}>
+            <Button
+              variant="outline"
+              onClick={() => setProductToDelete(null)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete success overlay */}
+      <AnimatePresence>
+        {deletedProductName && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ scale: 0.7, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+              className="bg-card border border-border rounded-2xl px-10 py-10 shadow-2xl flex flex-col items-center gap-5 max-w-sm text-center"
+            >
+              <motion.div
+                initial={{ scale: 0, rotate: -8 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{
+                  type: 'spring',
+                  stiffness: 300,
+                  damping: 18,
+                  delay: 0.06,
+                }}
+                className="w-20 h-20 rounded-full bg-muted flex items-center justify-center border-2 border-border ring-4 ring-muted/50"
+              >
+                <Trash2 className="w-9 h-9 text-muted-foreground" />
+              </motion.div>
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-muted-foreground tracking-[0.2em] uppercase">
+                  Removed from catalog
+                </p>
+                <h2 className="text-xl font-extrabold text-foreground">
+                  &quot;{deletedProductName}&quot; is no longer listed
+                </h2>
+                <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                  It&apos;s been soft-deleted. Your catalog has been updated.
+                  Contact support if you need to restore it.
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                onClick={() => setDeletedProductName(null)}
+              >
+                Dismiss
+              </Button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

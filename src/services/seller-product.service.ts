@@ -34,4 +34,14 @@ export const sellerProductService = {
   getProductById: async (id: string): Promise<SellerProduct> => {
     return apiService.get<SellerProduct>(`/v1/buyer/products/${id}`);
   },
+
+  /** Get seller's own product for editing (GET /v1/seller/products/:id) */
+  getProductForEdit: async (id: string): Promise<SellerProduct> => {
+    return apiService.get<SellerProduct>(`/v1/seller/products/${id}`);
+  },
+
+  /** Soft delete seller product (DELETE /v1/seller/products/:id) */
+  deleteProduct: async (id: string): Promise<void> => {
+    return apiService.delete(`/v1/seller/products/${id}`);
+  },
 };

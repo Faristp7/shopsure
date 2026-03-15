@@ -75,6 +75,39 @@ export interface ListSellerProductsQuery {
   status?: string;
 }
 
+// --- Admin product listing types ---
+
+export type AdminProductModerationStatus =
+  | 'PENDING'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'FLAGGED';
+
+export interface AdminProduct extends SellerProduct {
+  moderationStatus?: AdminProductModerationStatus;
+  sellerName?: string;
+  sellerId?: string;
+}
+
+export interface ListAdminProductsQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: AdminProductModerationStatus | string;
+}
+
+export interface ListAdminProductsMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface ListAdminProductsResponse {
+  items: AdminProduct[];
+  meta: ListAdminProductsMeta;
+}
+
 export interface CreateProductPayload {
   title: string;
   description: string;

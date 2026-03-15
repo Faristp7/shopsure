@@ -87,6 +87,7 @@ export default function AddProductPage() {
     handleSubmit,
     initializeFromExisting,
     justCreated,
+    justUpdated,
   } = useProductForm(productId ?? undefined);
 
   useEffect(() => {
@@ -931,11 +932,11 @@ export default function AddProductPage() {
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                       />
                     </svg>
-                    Publishing...
+                    {productId ? "Updating..." : "Publishing..."}
                   </>
                 ) : (
                   <>
-                    <Send className="h-4 w-4 mr-2" /> Publish Now
+                    <Send className="h-4 w-4 mr-2" /> {productId ? "Update Product" : "Publish Now"}
                   </>
                 )}
               </Button>
@@ -944,30 +945,31 @@ export default function AddProductPage() {
         </div>
       </motion.div>
 
-      {/* Success animation overlay for new product */}
+      {/* Success overlay — product added */}
       <AnimatePresence>
         {justCreated && !productId && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+            transition={{ duration: 0.25 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-md"
           >
             <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
+              initial={{ scale: 0.6, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 260, damping: 20 }}
-              className="bg-card border border-border rounded-2xl px-10 py-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm text-center"
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 280, damping: 22 }}
+              className="bg-card border border-border rounded-2xl px-10 py-10 shadow-2xl flex flex-col items-center gap-5 max-w-sm text-center"
             >
               <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", stiffness: 300, damping: 18 }}
-                className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/40"
+                initial={{ scale: 0, rotate: -12 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: "spring", stiffness: 320, damping: 18, delay: 0.05 }}
+                className="w-20 h-20 rounded-full bg-emerald-500/15 flex items-center justify-center border-2 border-emerald-500/50 ring-4 ring-emerald-500/10"
               >
                 <svg
-                  className="w-9 h-9 text-emerald-500"
+                  className="w-10 h-10 text-emerald-500"
                   viewBox="0 0 24 24"
                   fill="none"
                   xmlns="http://www.w3.org/2000/svg"
@@ -980,20 +982,78 @@ export default function AddProductPage() {
                     strokeLinejoin="round"
                     initial={{ pathLength: 0 }}
                     animate={{ pathLength: 1 }}
-                    transition={{ delay: 0.1, duration: 0.4, ease: "easeOut" }}
+                    transition={{ delay: 0.15, duration: 0.35, ease: "easeOut" }}
                   />
                 </svg>
               </motion.div>
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-emerald-500 tracking-[0.18em] uppercase">
-                  Product Live
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-emerald-500 tracking-[0.2em] uppercase">
+                  Listed successfully
                 </p>
                 <h2 className="text-xl font-extrabold text-foreground">
-                  Your product has been published
+                  Your product is now live
                 </h2>
-                <p className="text-xs text-muted-foreground max-w-xs mx-auto">
-                  Taking you back to your catalog so you can review or keep
-                  adding more products.
+                <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                  Shoppers can discover it on the marketplace. We&apos;ll take you
+                  back to your catalog in a moment.
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Success overlay — product updated (edit) */}
+      <AnimatePresence>
+        {justUpdated && productId && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 280, damping: 22 }}
+              className="bg-card border border-border rounded-2xl px-10 py-10 shadow-2xl flex flex-col items-center gap-5 max-w-sm text-center"
+            >
+              <motion.div
+                initial={{ scale: 0, rotate: 12 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: "spring", stiffness: 320, damping: 18, delay: 0.05 }}
+                className="w-20 h-20 rounded-full bg-primary/15 flex items-center justify-center border-2 border-primary/50 ring-4 ring-primary/10"
+              >
+                <svg
+                  className="w-10 h-10 text-primary"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <motion.path
+                    d="M5 13L9 17L19 7"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    initial={{ pathLength: 0 }}
+                    animate={{ pathLength: 1 }}
+                    transition={{ delay: 0.15, duration: 0.35, ease: "easeOut" }}
+                  />
+                </svg>
+              </motion.div>
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-primary tracking-[0.2em] uppercase">
+                  Changes saved
+                </p>
+                <h2 className="text-xl font-extrabold text-foreground">
+                  Product updated & live
+                </h2>
+                <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                  Your edits are live on the marketplace. Heading back to your
+                  catalog.
                 </p>
               </div>
             </motion.div>

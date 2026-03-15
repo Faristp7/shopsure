@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,7 @@ import {
 import { useProductForm } from "@/hooks/useProductForm";
 import CategorySelector from "@/components/seller/CategorySelector";
 import TagInput from "@/components/seller/TagInput";
+import { sellerProductService } from "@/services/seller-product.service";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -54,13 +55,17 @@ const sections = [
   { icon: ImagePlus, label: "Images" },
   { icon: Package, label: "Details" },
   { icon: IndianRupee, label: "Pricing" },
-  { icon: Layers, label: "Variants" },
+  { icon: Layers, label: "Variants & Attributes" },
   { icon: Weight, label: "Shipping" },
 ];
 
 export default function AddProductPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const productId = searchParams.get("id");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isLoadingExisting, setIsLoadingExisting] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const {
     form,
@@ -76,8 +81,41 @@ export default function AddProductPage() {
     addVariant,
     removeVariant,
     updateVariant,
+    addAttribute,
+    removeAttribute,
+    updateAttribute,
     handleSubmit,
-  } = useProductForm();
+    initializeFromExisting,
+    justCreated,
+  } = useProductForm(productId ?? undefined);
+
+  useEffect(() => {
+    if (!productId) return;
+
+    let isMounted = true;
+
+    const fetchProduct = async () => {
+      try {
+        setIsLoadingExisting(true);
+        setLoadError(null);
+        const product = await sellerProductService.getProductById(productId);
+        if (!isMounted) return;
+        initializeFromExisting(product);
+      } catch (error) {
+        if (!isMounted) return;
+        setLoadError("Failed to load product details. Please try again.");
+      } finally {
+        if (!isMounted) return;
+        setIsLoadingExisting(false);
+      }
+    };
+
+    fetchProduct();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [productId, initializeFromExisting]);
 
   const activeSection = 0; // Keep scroll-based section highlight simple
 
@@ -126,14 +164,25 @@ export default function AddProductPage() {
           </button>
           <div>
             <h1 className="text-2xl font-extrabold text-foreground">
-              Add New Product
+              {productId ? "Edit Product" : "Add New Product"}
             </h1>
             <p className="text-sm text-muted-foreground">
-              List your product on the ShopSure marketplace
+              {productId
+                ? "Update your product details on the ShopSure marketplace"
+                : "List your product on the ShopSure marketplace"}
             </p>
           </div>
         </div>
       </motion.div>
+
+      {isLoadingExisting && (
+        <p className="mb-4 text-xs text-muted-foreground">
+          Loading product details...
+        </p>
+      )}
+      {loadError && (
+        <p className="mb-4 text-xs text-destructive font-medium">{loadError}</p>
+      )}
 
       {/* Progress Steps */}
       <motion.div
@@ -349,15 +398,22 @@ export default function AddProductPage() {
                 htmlFor="brand"
                 className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1"
               >
-                Brand <span className="text-muted-foreground/50">(Optional)</span>
+                Brand
               </Label>
               <Input
                 id="brand"
                 placeholder="e.g. FabIndia, Levi's, Custom Brand"
-                className="h-11 font-semibold border-border/60 focus-visible:ring-primary/20"
+                className={`h-11 font-semibold focus-visible:ring-primary/20 ${
+                  errors.brand ? "border-destructive" : "border-border/60"
+                }`}
                 value={form.brand}
                 onChange={(e) => setField("brand", e.target.value)}
               />
+              {errors.brand && (
+                <p className="text-[11px] text-destructive font-medium ml-1">
+                  {errors.brand}
+                </p>
+              )}
             </div>
 
             {/* SKU */}
@@ -366,18 +422,25 @@ export default function AddProductPage() {
                 htmlFor="sku"
                 className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1"
               >
-                SKU <span className="text-muted-foreground/50">(Auto-generated if empty)</span>
+                SKU
               </Label>
               <div className="relative">
                 <Hash className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40" />
                 <Input
                   id="sku"
-                  placeholder="e.g. SKU-12345 or leave blank"
-                  className="h-11 pl-10 font-semibold border-border/60 focus-visible:ring-primary/20"
+                  placeholder="e.g. SKU-12345"
+                  className={`h-11 pl-10 font-semibold focus-visible:ring-primary/20 ${
+                    errors.sku ? "border-destructive" : "border-border/60"
+                  }`}
                   value={form.sku}
                   onChange={(e) => setField("sku", e.target.value)}
                 />
               </div>
+              {errors.sku && (
+                <p className="text-[11px] text-destructive font-medium ml-1">
+                  {errors.sku}
+                </p>
+              )}
             </div>
 
             {/* Tags */}
@@ -394,6 +457,11 @@ export default function AddProductPage() {
               <p className="text-[10px] text-muted-foreground/80 font-medium italic ml-1">
                 Tags help buyers find your product through search
               </p>
+              {errors.tags && (
+                <p className="text-[11px] text-destructive font-medium ml-1">
+                  {errors.tags}
+                </p>
+              )}
             </div>
           </div>
         </motion.div>
@@ -470,76 +538,49 @@ export default function AddProductPage() {
               </div>
             </div>
 
-            {/* Discount toggle */}
-            <div className="flex items-center justify-between p-4 rounded-xl bg-accent/30 border border-accent/20 shadow-inner">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-background flex items-center justify-center shadow-sm">
-                  <Tag className="h-5 w-5 text-primary" />
+            {/* Original price + discount */}
+            <div className="grid sm:grid-cols-2 gap-6 pt-2">
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">
+                  Original Price (₹)
+                </Label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold opacity-40">
+                    ₹
+                  </span>
+                  <Input
+                    placeholder="2,499"
+                    type="number"
+                    className={`pl-10 h-11 line-through text-muted-foreground font-semibold focus-visible:ring-primary/20 ${
+                      errors.originalPrice
+                        ? "border-destructive"
+                        : "border-border/60"
+                    }`}
+                    value={form.originalPrice}
+                    onChange={(e) => setField("originalPrice", e.target.value)}
+                  />
                 </div>
-                <div>
-                  <p className="text-sm font-bold text-foreground">
-                    Add a Discount
+                {errors.originalPrice && (
+                  <p className="text-[11px] text-destructive font-medium ml-1">
+                    {errors.originalPrice}
                   </p>
-                  <p className="text-[10px] text-muted-foreground font-bold tracking-tight uppercase">
-                    Show a slashed price to attract more buyers
-                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">
+                  Calculated Discount
+                </Label>
+                <div className="h-11 px-4 border border-success/30 rounded-lg bg-success/10 flex items-center shadow-inner">
+                  <span className="text-success font-extrabold text-base tracking-tight uppercase">
+                    {discount ? `${discount}% OFF` : "—"}
+                  </span>
                 </div>
               </div>
-              <Switch
-                checked={!!form.originalPrice}
-                onCheckedChange={(checked) => {
-                  if (!checked) setField("originalPrice", "");
-                }}
-              />
             </div>
-
-            <AnimatePresence>
-              {(!!form.originalPrice || form.originalPrice === "") && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="overflow-hidden"
-                >
-                  <div className="grid sm:grid-cols-2 gap-6 pt-2">
-                    <div className="space-y-2">
-                      <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">
-                        Original Price (₹)
-                      </Label>
-                      <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold opacity-40">
-                          ₹
-                        </span>
-                        <Input
-                          placeholder="2,499"
-                          type="number"
-                          className="pl-10 h-11 line-through text-muted-foreground font-semibold border-border/60"
-                          value={form.originalPrice}
-                          onChange={(e) =>
-                            setField("originalPrice", e.target.value)
-                          }
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">
-                        Calculated Discount
-                      </Label>
-                      <div className="h-11 px-4 border border-success/30 rounded-lg bg-success/10 flex items-center shadow-inner">
-                        <span className="text-success font-extrabold text-base tracking-tight uppercase">
-                          {discount ? `${discount}% OFF` : "—"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
         </motion.div>
 
-        {/* SECTION 4: Variants */}
+        {/* SECTION 4: Variants & Attributes */}
         <motion.div
           id="section-3"
           custom={3}
@@ -555,10 +596,10 @@ export default function AddProductPage() {
               </div>
               <div>
                 <h3 className="font-extrabold text-foreground">
-                  Product Variants
+                  Variants & Attributes
                 </h3>
                 <p className="text-xs text-muted-foreground font-medium">
-                  Add size, color, or other customizable options
+                  Add size/color options and key product attributes
                 </p>
               </div>
             </div>
@@ -568,6 +609,7 @@ export default function AddProductPage() {
             />
           </div>
 
+          {/* Variants */}
           <AnimatePresence>
             {form.hasVariants && (
               <motion.div
@@ -687,6 +729,82 @@ export default function AddProductPage() {
               </motion.div>
             )}
           </AnimatePresence>
+          {errors.variants && (
+            <p className="text-[11px] text-destructive font-medium ml-1 mt-2">
+              {errors.variants}
+            </p>
+          )}
+
+          {/* Attributes */}
+          <div className="mt-8 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                  Product Attributes
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Add material, fit, care instructions, etc.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-xs font-bold"
+                onClick={addAttribute}
+              >
+                <Plus className="h-3 w-3 mr-1" /> Add Attribute
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              {form.attributes.map((attribute) => (
+                <div
+                  key={attribute.id}
+                  className="grid grid-cols-1 sm:grid-cols-[1fr,2fr,auto] gap-3 items-start bg-muted/30 border border-border/40 rounded-xl p-3"
+                >
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                      Name
+                    </Label>
+                    <Input
+                      placeholder="e.g. Material"
+                      className="h-9 text-sm font-medium"
+                      value={attribute.name}
+                      onChange={(e) =>
+                        updateAttribute(attribute.id, "name", e.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                      Value
+                    </Label>
+                    <Input
+                      placeholder="e.g. 100% Cotton"
+                      className="h-9 text-sm font-medium"
+                      value={attribute.value}
+                      onChange={(e) =>
+                        updateAttribute(attribute.id, "value", e.target.value)
+                      }
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeAttribute(attribute.id)}
+                    className="mt-6 p-1.5 hover:bg-destructive/10 rounded-lg text-muted-foreground hover:text-destructive transition-all self-start"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            {errors.attributes && (
+              <p className="text-[11px] text-destructive font-medium ml-1">
+                {errors.attributes}
+              </p>
+            )}
+          </div>
         </motion.div>
 
         {/* SECTION 5: Shipping */}
@@ -789,7 +907,7 @@ export default function AddProductPage() {
               <Button
                 className="w-full h-11 font-extrabold shadow-lg shadow-primary/20 rounded-xl px-8 uppercase tracking-widest text-xs"
                 onClick={handleSubmit}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isLoadingExisting}
               >
                 {isSubmitting ? (
                   <>
@@ -825,6 +943,63 @@ export default function AddProductPage() {
           </div>
         </div>
       </motion.div>
+
+      {/* Success animation overlay for new product */}
+      <AnimatePresence>
+        {justCreated && !productId && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 260, damping: 20 }}
+              className="bg-card border border-border rounded-2xl px-10 py-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm text-center"
+            >
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 300, damping: 18 }}
+                className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/40"
+              >
+                <svg
+                  className="w-9 h-9 text-emerald-500"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <motion.path
+                    d="M5 13L9 17L19 7"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    initial={{ pathLength: 0 }}
+                    animate={{ pathLength: 1 }}
+                    transition={{ delay: 0.1, duration: 0.4, ease: "easeOut" }}
+                  />
+                </svg>
+              </motion.div>
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-emerald-500 tracking-[0.18em] uppercase">
+                  Product Live
+                </p>
+                <h2 className="text-xl font-extrabold text-foreground">
+                  Your product has been published
+                </h2>
+                <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                  Taking you back to your catalog so you can review or keep
+                  adding more products.
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

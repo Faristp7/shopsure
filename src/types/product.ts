@@ -14,6 +14,11 @@ export interface ProductVariant {
   price: number;
 }
 
+export interface ProductAttribute {
+  name: string;
+  value: string;
+}
+
 export interface ProductShipping {
   weight: number;
   length: number;
@@ -21,18 +26,72 @@ export interface ProductShipping {
   height: number;
 }
 
+// --- Seller product listing types ---
+
+export interface SellerProduct {
+  id: string;
+  sellerId: string;
+  categoryId: string;
+  title: string;
+  description: string;
+  brand: string;
+  sku: string;
+  price: string;
+  originalPrice: string;
+  gstRate: string;
+  stock: number;
+  tags: string[];
+  images: (ProductImage & { sortOrder: number })[];
+  variants: ProductVariant[];
+  attributes: ProductAttribute[];
+  shipping: ProductShipping;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  category: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+}
+
+export interface ListSellerProductsMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface ListSellerProductsResponse {
+  items: SellerProduct[];
+  meta: ListSellerProductsMeta;
+}
+
+export interface ListSellerProductsQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+}
+
 export interface CreateProductPayload {
   title: string;
   description: string;
   categoryId: string;
-  brand?: string;
+  // Brand is required in backend DTO
+  brand: string;
   sku: string;
   tags: string[];
   sellingPrice: number;
-  originalPrice?: number;
+  // Original price is required in backend DTO
+  originalPrice: number;
   stock: number;
   images: ProductImage[];
-  variants?: ProductVariant[];
+  // Backend requires at least one variant
+  variants: ProductVariant[];
+  // Backend requires at least one attribute
+  attributes: ProductAttribute[];
   shipping: ProductShipping;
 }
 
@@ -44,6 +103,12 @@ export interface VariantFormRow {
   value: string;
   stock: string;
   price: string;
+}
+
+export interface AttributeFormRow {
+  id: string;
+  name: string;
+  value: string;
 }
 
 export interface ImageFormItem {
@@ -68,6 +133,7 @@ export interface ProductFormState {
   images: ImageFormItem[];
   hasVariants: boolean;
   variants: VariantFormRow[];
+   attributes: AttributeFormRow[];
   shipping: {
     weight: string;
     length: string;
@@ -80,10 +146,15 @@ export interface ProductFormErrors {
   title?: string;
   description?: string;
   categoryId?: string;
+  brand?: string;
   sellingPrice?: string;
+  originalPrice?: string;
   stock?: string;
   images?: string;
   sku?: string;
+  tags?: string;
+  attributes?: string;
+  variants?: string;
   [key: string]: string | undefined;
 }
 

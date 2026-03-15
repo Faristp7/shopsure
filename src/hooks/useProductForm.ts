@@ -11,6 +11,8 @@ import {
   CreateProductPayload,
   ImageFormItem,
   VariantFormRow,
+  AttributeFormRow,
+  SellerProduct,
 } from '@/types/product';
 
 const initialFormState: ProductFormState = {
@@ -27,6 +29,7 @@ const initialFormState: ProductFormState = {
   images: [],
   hasVariants: false,
   variants: [{ id: '1', type: 'Size', value: '', stock: '', price: '' }],
+  attributes: [{ id: '1', name: '', value: '' }],
   shipping: {
     weight: '',
     length: '',
@@ -35,11 +38,12 @@ const initialFormState: ProductFormState = {
   },
 };
 
-export function useProductForm() {
+export function useProductForm(productId?: string) {
   const router = useRouter();
   const [form, setForm] = useState<ProductFormState>(initialFormState);
   const [errors, setErrors] = useState<ProductFormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [justCreated, setJustCreated] = useState(false);
 
   // --- Field setters ---
 
@@ -61,6 +65,66 @@ export function useProductForm() {
       ...prev,
       shipping: { ...prev.shipping, [key]: value },
     }));
+  }, []);
+
+  const initializeFromExisting = useCallback((product: SellerProduct) => {
+    const hasRealVariants =
+      Array.isArray(product.variants) &&
+      product.variants.length > 0 &&
+      !(product.variants.length === 1 &&
+        product.variants[0].type === 'Default' &&
+        product.variants[0].value === 'Default');
+
+    const images: ImageFormItem[] =
+      product.images?.map((img) => ({
+        id: `img-${img.sortOrder}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        url: img.url,
+        preview: img.url,
+      })) ?? [];
+
+    const variants: VariantFormRow[] =
+      hasRealVariants && product.variants.length > 0
+        ? product.variants.map((v, index) => ({
+            id: `var-${index}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            type: v.type,
+            value: v.value,
+            stock: v.stock != null ? String(v.stock) : '',
+            price: v.price != null ? String(v.price) : '',
+          }))
+        : initialFormState.variants;
+
+    const attributes: AttributeFormRow[] =
+      product.attributes && product.attributes.length > 0
+        ? product.attributes.map((a, index) => ({
+            id: `attr-${index}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            name: a.name,
+            value: a.value,
+          }))
+        : initialFormState.attributes;
+
+    setForm({
+      title: product.title ?? '',
+      description: product.description ?? '',
+      categoryId: product.categoryId,
+      categoryDisplayName: product.category?.name ?? '',
+      brand: product.brand ?? '',
+      sku: product.sku ?? '',
+      tags: product.tags ?? [],
+      sellingPrice: product.price != null ? String(product.price) : '',
+      originalPrice: product.originalPrice != null ? String(product.originalPrice) : '',
+      stock: product.stock != null ? String(product.stock) : '',
+      images,
+      hasVariants: hasRealVariants,
+      variants,
+      attributes,
+      shipping: {
+        weight: product.shipping?.weight != null ? String(product.shipping.weight) : '',
+        length: product.shipping?.length != null ? String(product.shipping.length) : '',
+        width: product.shipping?.width != null ? String(product.shipping.width) : '',
+        height: product.shipping?.height != null ? String(product.shipping.height) : '',
+      },
+    });
+    setErrors({});
   }, []);
 
   // --- Images ---
@@ -114,6 +178,40 @@ export function useProductForm() {
     }));
   }, []);
 
+  // --- Attributes ---
+
+  const updateAttribute = useCallback(
+    (id: string, field: keyof AttributeFormRow, value: string) => {
+      setForm((prev) => ({
+        ...prev,
+        attributes: prev.attributes.map((a) =>
+          a.id === id ? { ...a, [field]: value } : a,
+        ),
+      }));
+    },
+    [],
+  );
+
+  const addAttribute = useCallback(() => {
+    setForm((prev) => ({
+      ...prev,
+      attributes: [
+        ...prev.attributes,
+        { id: Date.now().toString(), name: '', value: '' },
+      ],
+    }));
+  }, []);
+
+  const removeAttribute = useCallback((id: string) => {
+    setForm((prev) => {
+      if (prev.attributes.length <= 1) return prev;
+      return {
+        ...prev,
+        attributes: prev.attributes.filter((a) => a.id !== id),
+      };
+    });
+  }, []);
+
   // --- Variants ---
 
   const updateVariant = useCallback((id: string, field: keyof VariantFormRow, value: string) => {
@@ -148,10 +246,39 @@ export function useProductForm() {
     if (!form.title.trim()) errs.title = 'Product title is required';
     if (!form.description.trim()) errs.description = 'Description is required';
     if (!form.categoryId) errs.categoryId = 'Please select a category';
+    if (!form.brand.trim()) errs.brand = 'Brand is required';
+    if (!form.sku.trim()) errs.sku = 'SKU is required';
+    if (!form.tags || form.tags.length === 0)
+      errs.tags = 'Please add at least one tag';
     if (!form.sellingPrice || Number(form.sellingPrice) <= 0)
       errs.sellingPrice = 'Selling price must be greater than 0';
+    if (!form.originalPrice || Number(form.originalPrice) <= 0) {
+      errs.originalPrice = 'Original price is required';
+    }
+    if (
+      form.originalPrice &&
+      form.sellingPrice &&
+      Number(form.originalPrice) < Number(form.sellingPrice)
+    ) {
+      errs.originalPrice =
+        'Original price should be greater than or equal to selling price';
+    }
     if (!form.stock || Number(form.stock) < 0) errs.stock = 'Stock quantity is required';
     if (form.images.length === 0) errs.images = 'At least one image is required';
+
+    const filledAttributes = form.attributes.filter(
+      (a) => a.name.trim() && a.value.trim(),
+    );
+    if (filledAttributes.length === 0) {
+      errs.attributes = 'Please add at least one attribute';
+    }
+
+    if (form.hasVariants) {
+      const filledVariants = form.variants.filter((v) => v.value.trim());
+      if (filledVariants.length === 0) {
+        errs.variants = 'Please add at least one variant';
+      }
+    }
 
     return errs;
   }, [form]);
@@ -192,11 +319,19 @@ export function useProductForm() {
         title: form.title.trim(),
         description: form.description.trim(),
         categoryId: form.categoryId,
+        brand: form.brand.trim(),
         sku,
         tags: form.tags,
         sellingPrice: Number(form.sellingPrice),
+        originalPrice: Number(form.originalPrice),
         stock: Number(form.stock),
         images: uploadedImages,
+        attributes: form.attributes
+          .filter((a) => a.name.trim() && a.value.trim())
+          .map((a) => ({
+            name: a.name.trim(),
+            value: a.value.trim(),
+          })),
         shipping: {
           weight: Number(form.shipping.weight) || 0,
           length: Number(form.shipping.length) || 0,
@@ -205,30 +340,41 @@ export function useProductForm() {
         },
       };
 
-      if (form.brand.trim()) {
-        payload.brand = form.brand.trim();
-      }
-
-      if (form.originalPrice && Number(form.originalPrice) > 0) {
-        payload.originalPrice = Number(form.originalPrice);
-      }
-
+      // Build variants payload:
+      // - If seller has defined variants, use them
+      // - Otherwise create a single default variant from main stock/price
       if (form.hasVariants && form.variants.length > 0) {
         const validVariants = form.variants.filter((v) => v.value.trim());
-        if (validVariants.length > 0) {
-          payload.variants = validVariants.map((v) => ({
-            type: v.type,
-            value: v.value.trim(),
-            stock: Number(v.stock) || 0,
-            price: Number(v.price) || 0,
-          }));
-        }
+        payload.variants = validVariants.map((v) => ({
+          type: v.type,
+          value: v.value.trim(),
+          stock: Number(v.stock) || 0,
+          price: Number(v.price) || 0,
+        }));
+      } else {
+        payload.variants = [
+          {
+            type: 'Default',
+            value: 'Default',
+            stock: Number(form.stock),
+            price: Number(form.sellingPrice),
+          },
+        ];
       }
 
-      // 4. Create product
-      await sellerProductService.createProduct(payload);
-
-      toast.success('Product published successfully!');
+      // 4. Create or update product
+      if (productId) {
+        await sellerProductService.updateProduct(productId, payload);
+        toast.success('Product updated successfully!');
+      } else {
+        await sellerProductService.createProduct(payload);
+        toast.success('Product published successfully!');
+        setJustCreated(true);
+        setTimeout(() => {
+          router.push('/seller/products');
+        }, 900);
+        return;
+      }
       router.push('/seller/products');
     } catch (error: any) {
       const message = error?.response?.data?.message || error?.message || 'Failed to create product';
@@ -236,7 +382,7 @@ export function useProductForm() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [form, validate, router]);
+  }, [form, validate, router, productId]);
 
   // --- Computed values ---
 
@@ -249,6 +395,7 @@ export function useProductForm() {
     form,
     errors,
     isSubmitting,
+    justCreated,
     discount,
     setField,
     setShippingField,
@@ -259,6 +406,10 @@ export function useProductForm() {
     addVariant,
     removeVariant,
     updateVariant,
+    addAttribute,
+    removeAttribute,
+    updateAttribute,
     handleSubmit,
+    initializeFromExisting,
   };
 }

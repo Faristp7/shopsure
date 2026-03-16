@@ -5,6 +5,7 @@ import QueryProvider from "@/providers/query-provider";
 import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@/lib/utils";
 import { PWASetup } from "@/components/pwa-setup";
+import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -41,6 +42,7 @@ export default function RootLayout({
             {children}
           </QueryProvider>
         </ThemeProvider>
+        <Toaster richColors position="top-right" />
         <PWASetup />
       </body>
     </html>

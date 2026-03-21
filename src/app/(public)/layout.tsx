@@ -1,11 +1,36 @@
-export default function PublicLayout({
-    children,
+"use client";
+
+import { AuthProvider } from "./context/AuthContext";
+import { CartProvider } from "./context/CartContext";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import Navbar from "./components/Navbar";
+import Footer from "./components/Footer";
+import { LoginModal, SignupModal } from "./components/AuthModals";
+
+export default function UserLayout({
+  children,
 }: {
-    children: React.ReactNode;
+  children: React.ReactNode;
 }) {
-    return (
-        <div className="flex min-h-screen flex-col">
-            <main className="flex-1">{children}</main>
-        </div>
-    );
+  return (
+    <AuthProvider>
+      <CartProvider>
+        <TooltipProvider>
+          <div className="min-h-screen bg-background flex flex-col">
+            <Navbar />
+            <main className="flex-1">
+              {children}
+            </main>
+            <Footer />
+          </div>
+          <Toaster />
+          <Sonner />
+          <LoginModal />
+          <SignupModal />
+        </TooltipProvider>
+      </CartProvider>
+    </AuthProvider>
+  );
 }

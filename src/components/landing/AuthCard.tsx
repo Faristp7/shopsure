@@ -14,12 +14,17 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { sellerAuthService } from "@/services/seller-auth.service";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  getSafeCallbackUrlForSeller,
+  resolveSellerPostLoginDestination,
+} from "@/lib/safe-callback-url";
 
 const OTP_LENGTH = 6;
 
 const AuthCard = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<"signup" | "login">("signup");
   const [showPassword, setShowPassword] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -98,17 +103,11 @@ const AuthCard = () => {
       document.cookie = `refreshToken=${response.refreshToken}; path=/; max-age=604800; SameSite=Strict`;
       localStorage.setItem("seller", JSON.stringify(response.seller));
 
-      if (response.redirectTo === "waiting-approval") {
-        router.push("/seller/onboarding");
-      } else if (response.redirectTo === "onboarding") {
-        router.push("/seller/onboarding");
-      } else if (response.redirectTo === "rejected") {
-        router.push("/seller/onboarding");
-      } else if (response.redirectTo === "verify-email") {
-        router.push("/seller/verify-email");
-      } else {
-        router.push("/seller/dashboard");
-      }
+      const next = resolveSellerPostLoginDestination(
+        response.redirectTo,
+        searchParams.get("callbackUrl"),
+      );
+      router.push(next);
     } catch (error: any) {
       console.error("Login failed:", error);
       setAuthError(
@@ -174,7 +173,11 @@ const AuthCard = () => {
       document.cookie = `refreshToken=${response.refreshToken}; path=/; max-age=604800; SameSite=Strict`;
       localStorage.setItem("user", JSON.stringify(response.user));
 
-      router.push("/seller/dashboard");
+      const next = getSafeCallbackUrlForSeller(
+        searchParams.get("callbackUrl"),
+        "/seller/dashboard",
+      );
+      router.push(next);
     } catch (error: any) {
       console.error("OTP Verification failed:", error);
       setOtpError(

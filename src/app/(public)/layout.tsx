@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { AuthProvider } from "./context/AuthContext";
 import { CartProvider } from "./context/CartContext";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -27,8 +28,10 @@ export default function UserLayout({
           </div>
           <Toaster />
           <Sonner />
-          <LoginModal />
-          <SignupModal />
+          <Suspense fallback={null}>
+            <LoginModal />
+            <SignupModal />
+          </Suspense>
         </TooltipProvider>
       </CartProvider>
     </AuthProvider>

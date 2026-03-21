@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { decodeJwt } from "jose";
+import {
+  getSafeCallbackUrlForAdmin,
+  getSafeCallbackUrlForSeller,
+} from "@/lib/safe-callback-url";
+
+const MAX_CALLBACK_LEN = 2048;
 
 type SellerStatus =
   | "PENDING_EMAIL_VERIFICATION"
@@ -8,6 +14,20 @@ type SellerStatus =
   | "PENDING_ADMIN_APPROVAL"
   | "APPROVED"
   | "REJECTED";
+
+function redirectToLoginWithCallback(
+  request: NextRequest,
+  loginPath: string,
+) {
+  const url = new URL(loginPath, request.url);
+  const returnPath = request.nextUrl.pathname + request.nextUrl.search;
+  const safeReturn =
+    returnPath.length > MAX_CALLBACK_LEN
+      ? request.nextUrl.pathname
+      : returnPath;
+  url.searchParams.set("callbackUrl", safeReturn);
+  return NextResponse.redirect(url);
+}
 
 export function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
@@ -27,18 +47,19 @@ export function proxy(request: NextRequest) {
 
   // Admin Route Protection
   if (path.startsWith("/admin")) {
-    // 1. If trying to access login page AND already logged in as ADMIN -> Redirect to Dashboard
+    // 1. If trying to access login page AND already logged in as ADMIN -> Redirect to Dashboard or callback
     if (path === "/admin" || path === "/admin/auth") {
       if (userRole === "ADMIN") {
-        return NextResponse.redirect(new URL("/admin/dashboard", request.url));
+        const raw = request.nextUrl.searchParams.get("callbackUrl");
+        const target = getSafeCallbackUrlForAdmin(raw, "/admin/dashboard");
+        return NextResponse.redirect(new URL(target, request.url));
       }
-      // return NextResponse.redirect(new URL("/admin/auth", request.url));
       return NextResponse.next();
     }
 
     // 2. If trying to access protected admin routes AND (not logged in OR not ADMIN) -> Redirect to Login
     if (userRole !== "ADMIN") {
-      return NextResponse.redirect(new URL("/admin/auth", request.url));
+      return redirectToLoginWithCallback(request, "/admin/auth");
     }
   }
 
@@ -50,7 +71,9 @@ export function proxy(request: NextRequest) {
         if (sellerStatus === "ONBOARDING_INCOMPLETE" || sellerStatus === "PENDING_ADMIN_APPROVAL") {
           return NextResponse.redirect(new URL("/seller/onboarding", request.url));
         }
-        return NextResponse.redirect(new URL("/seller/dashboard", request.url));
+        const raw = request.nextUrl.searchParams.get("callbackUrl");
+        const target = getSafeCallbackUrlForSeller(raw, "/seller/dashboard");
+        return NextResponse.redirect(new URL(target, request.url));
       }
       return NextResponse.next();
     }
@@ -58,7 +81,7 @@ export function proxy(request: NextRequest) {
     // 2. Protected seller routes: If not logged in OR not SELLER -> Redirect to Landing/Login
     // Note: We exclude static assets and basic public seller paths if any
     if (userRole !== "SELLER") {
-      return NextResponse.redirect(new URL("/seller", request.url));
+      return redirectToLoginWithCallback(request, "/seller");
     }
 
     // 3. User is SELLER. Handle Onboarding routing logic.

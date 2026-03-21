@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from "react";
 import { apiService } from "@/services/api";
 import { AuthResponse } from "@/types/auth";
 
@@ -9,7 +10,8 @@ import { AuthResponse } from "@/types/auth";
 
 // ... re-evaluating imports ...
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
+import { getSafeCallbackUrlForAdmin } from "@/lib/safe-callback-url"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -32,8 +34,9 @@ const formSchema = z.object({
     password: z.string().min(6),
 })
 
-export default function AdminAuthPage() {
+function AdminAuthForm() {
     const router = useRouter()
+    const searchParams = useSearchParams()
     const [isLoading, setIsLoading] = useState(false)
     const [loginError, setLoginError] = useState<string | null>(null)
 
@@ -58,7 +61,11 @@ export default function AdminAuthPage() {
             // Optionally store user info in localStorage or Context
             localStorage.setItem('user', JSON.stringify(response.user));
 
-            router.push("/admin/dashboard")
+            const next = getSafeCallbackUrlForAdmin(
+                searchParams.get("callbackUrl"),
+                "/admin/dashboard",
+            )
+            router.push(next)
         } catch (error: any) {
             console.error("Login failed:", error);
             setLoginError(error.response?.data?.message || "Login failed. Please check your credentials.");
@@ -119,4 +126,18 @@ export default function AdminAuthPage() {
             </Card>
         </div>
     )
+}
+
+export default function AdminAuthPage() {
+    return (
+        <Suspense
+            fallback={
+                <div className="flex min-h-screen items-center justify-center bg-muted/20 px-4 text-muted-foreground">
+                    Loading…
+                </div>
+            }
+        >
+            <AdminAuthForm />
+        </Suspense>
+    );
 }

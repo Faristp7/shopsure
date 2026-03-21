@@ -1,6 +1,7 @@
 import { Category, ListCategoriesResponse } from '@/types/category';
 import { CategoryTreeNode } from '@/types/product';
 import { adminCategoryService } from './admin-category';
+import { sellerCategoryService } from './seller-category';
 
 /**
  * Build a hierarchical tree from a flat array of categories with parentId.
@@ -33,13 +34,10 @@ export const categoryService = {
    * Reuses the admin categories endpoint via adminCategoryService.
    */
   getAllCategories: async (): Promise<ListCategoriesResponse> => {
-    return adminCategoryService.getCategories({
+    return sellerCategoryService.getCategories({
       // API enforces max limit of 100
       limit: 100,
       rootsOnly: false,
-      isActive: true,
-      sortBy: 'sortOrder',
-      sortDirection: 'asc',
     });
   },
 };

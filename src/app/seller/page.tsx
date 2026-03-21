@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Shield, CreditCard, Palette } from "lucide-react";
@@ -144,7 +145,9 @@ export default function SellerLandingPage() {
               transition={{ duration: 0.7, delay: 0.3, ease: "easeOut" }}
               className="flex flex-col items-center lg:items-end lg:min-h-[70vh]"
             >
-              <AuthCard />
+              <Suspense fallback={<div className="w-full max-w-md min-h-[420px] rounded-2xl bg-muted/30 animate-pulse" />}>
+                <AuthCard />
+              </Suspense>
             </motion.div>
           </div>
         </div>

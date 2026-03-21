@@ -1,12 +1,18 @@
+"use client";
+
 import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "../context/AuthContext";
 import { Eye, EyeOff, Mail, Lock, User } from "lucide-react";
+import { getSafeCallbackUrlForShop } from "@/lib/safe-callback-url";
 
 export const LoginModal = () => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { showLogin, setShowLogin, setShowSignup, login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -14,7 +20,14 @@ export const LoginModal = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (email && password) login(email, password);
+    if (email && password) {
+      login(email, password);
+      const next = getSafeCallbackUrlForShop(
+        searchParams.get("callbackUrl"),
+        "/",
+      );
+      router.replace(next);
+    }
   };
 
   return (
@@ -62,6 +75,8 @@ export const LoginModal = () => {
 };
 
 export const SignupModal = () => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { showSignup, setShowSignup, setShowLogin, signup } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -70,7 +85,14 @@ export const SignupModal = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name && email && password) signup(name, email, password);
+    if (name && email && password) {
+      signup(name, email, password);
+      const next = getSafeCallbackUrlForShop(
+        searchParams.get("callbackUrl"),
+        "/",
+      );
+      router.replace(next);
+    }
   };
 
   return (

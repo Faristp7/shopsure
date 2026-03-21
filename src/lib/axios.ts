@@ -148,13 +148,14 @@ api.interceptors.response.use(
           document.cookie = 'accessToken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
           document.cookie = 'refreshToken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
 
-          const currentPath = window.location.pathname;
-          if (currentPath.startsWith('/seller')) {
-            window.location.href = '/seller';
-          } else if (currentPath.startsWith('/admin')) {
-            window.location.href = '/admin/auth';
+          const returnPath = window.location.pathname + window.location.search;
+          const q = `?callbackUrl=${encodeURIComponent(returnPath)}`;
+          if (returnPath.startsWith('/seller')) {
+            window.location.href = '/seller' + q;
+          } else if (returnPath.startsWith('/admin')) {
+            window.location.href = '/admin/auth' + q;
           } else {
-            window.location.href = '/login';
+            window.location.href = '/' + q;
           }
         }
         return Promise.reject(err);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "../context/AuthContext";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 export default function AuthenticatedLayout({
@@ -11,13 +11,19 @@ export default function AuthenticatedLayout({
 }) {
   const { isLoggedIn, setShowLogin } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!isLoggedIn) {
-      router.push("/user");
+      const search =
+        typeof window !== "undefined" ? window.location.search : "";
+      const returnPath = pathname + search;
+      router.replace(
+        `/?callbackUrl=${encodeURIComponent(returnPath)}`,
+      );
       setShowLogin(true);
     }
-  }, [isLoggedIn, router, setShowLogin]);
+  }, [isLoggedIn, router, setShowLogin, pathname]);
 
   if (!isLoggedIn) {
     return null; // Or a loading spinner

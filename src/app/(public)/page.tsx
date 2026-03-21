@@ -282,17 +282,6 @@ export default function UserHomePage() {
             </div>
           </Link>
 
-          {/* Bottom right - gift card */}
-          <div className="bg-secondary rounded-2xl p-6 flex flex-col justify-between">
-            <Gift className="w-8 h-8 text-foreground" />
-            <div>
-              <h4 className="text-sm font-bold text-foreground">Gift Cards</h4>
-              <p className="text-xs text-muted-foreground mt-1">The perfect present</p>
-              <button className="mt-3 bg-primary text-primary-foreground text-xs font-semibold px-4 py-2 rounded-full hover:opacity-90 transition-opacity">
-                Buy Now
-              </button>
-            </div>
-          </div>
         </div>
       </section>
 

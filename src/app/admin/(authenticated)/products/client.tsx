@@ -73,7 +73,7 @@ const STATUS_FILTER_OPTIONS: { value: AdminProductListStatusFilter; label: strin
 
 const PAGE_SIZE = 10;
 
-type DisplayStatus = 'ACTIVE' | 'DISABLED_BY_ADMIN' | 'OUT_OF_STOCK';
+type DisplayStatus = 'ACTIVE' | 'DISABLED_BY_ADMIN' | 'OUT_OF_STOCK' | 'DELETED';
 
 function getDisplayStatus(product: AdminProduct): DisplayStatus {
   const stock = typeof product.stock === 'number' ? product.stock : parseInt(String(product.stock), 10) || 0;
@@ -527,7 +527,7 @@ export default function AdminProductsClient() {
                       <TableCell>{product.price ? `₹${product.price}` : '—'}</TableCell>
                       <TableCell>{product.stock ?? '—'}</TableCell>
                       <TableCell>
-                        <StatusBadge status={displayStatus} />
+                        <StatusBadge status={product.status} />
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {product.createdAt

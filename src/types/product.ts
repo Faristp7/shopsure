@@ -87,6 +87,7 @@ export interface AdminProduct extends SellerProduct {
   moderationStatus?: AdminProductModerationStatus;
   sellerName?: string;
   image?: string | null;
+  status: 'ACTIVE' | 'DISABLED_BY_ADMIN' | 'DELETED' | 'OUT_OF_STOCK';
 }
 
 /** Display status for admin product list filter (All | Active | Disabled by Admin | Out of Stock) */

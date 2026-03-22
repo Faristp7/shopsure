@@ -86,6 +86,7 @@ export type AdminProductModerationStatus =
 export interface AdminProduct extends SellerProduct {
   moderationStatus?: AdminProductModerationStatus;
   sellerName?: string;
+  image?: string | null;
 }
 
 /** Display status for admin product list filter (All | Active | Disabled by Admin | Out of Stock) */

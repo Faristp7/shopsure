@@ -207,12 +207,12 @@ export default function AdminProductsClient() {
 
   const { data: categoriesData } = useQuery({
     queryKey: ['admin-categories-list'],
-    queryFn: () => adminCategoryService.getCategories({ isActive: true, limit: 200 }),
+    queryFn: () => adminCategoryService.getCategories({ isActive: true, limit: 10 }),
   });
 
   const { data: sellersData } = useQuery({
     queryKey: ['admin-sellers-list'],
-    queryFn: () => adminSellerService.getSellers({ limit: 200 }),
+    queryFn: () => adminSellerService.getSellers({ limit: 10 }),
   });
 
   const disableMutation = useMutation({
@@ -488,7 +488,6 @@ export default function AdminProductsClient() {
               {!isLoading &&
                 !isError &&
                 items.map((product) => {
-                  const coverImage = product.images?.find((img) => img.isCover) ?? product.images?.[0];
                   const displayStatus = getDisplayStatus(product);
                   return (
                     <TableRow key={product.id}>
@@ -502,10 +501,10 @@ export default function AdminProductsClient() {
                       <TableCell>
                         <div className="flex items-center gap-2 min-w-0">
                           <div className="h-10 w-10 rounded-md overflow-hidden bg-muted shrink-0">
-                            {coverImage?.url ? (
+                            {product?.image? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img
-                                src={coverImage.url}
+                                src={product?.image}
                                 alt=""
                                 className="h-full w-full object-cover"
                               />

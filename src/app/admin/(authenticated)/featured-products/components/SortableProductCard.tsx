@@ -97,7 +97,7 @@ export function SortableProductCard({ product, onRemove }: SortableProductCardPr
           {isOutOfStock ? (
             <Badge variant="destructive">Out of Stock</Badge>
           ) : isLowStock ? (
-            <Badge variant="warning" className="bg-yellow-500 text-white hover:bg-yellow-600">Low Stock ({product.stock})</Badge>
+            <Badge className="bg-yellow-500 text-white hover:bg-yellow-600">Low Stock ({product.stock})</Badge>
           ) : (
             <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900 dark:text-green-300">In Stock</Badge>
           )}

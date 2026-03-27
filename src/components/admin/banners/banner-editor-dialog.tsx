@@ -43,6 +43,7 @@ import {
   datetimeLocalToIso,
   isoToDatetimeLocalValue,
 } from "./banner-helpers"
+import { bannerService } from "@/lib/api/banner.service"
 
 const bannerFormSchema = z
   .object({
@@ -64,14 +65,7 @@ const bannerFormSchema = z
 
 type BannerFormValues = z.infer<typeof bannerFormSchema>
 
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result))
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
-  })
-}
+// local file reading logic removed as we now use backend upload
 
 function defaultFormValues(): BannerFormValues {
   const start = new Date()
@@ -187,11 +181,11 @@ function ImageDropField({ value, onChange, label, helper, targetW, targetH }: Im
     }
     setBusy(true)
     try {
-      const url = await fileToDataUrl(file)
+      const url = await bannerService.uploadImage(file)
       onChange(url)
       toast.success(`${label} updated`)
     } catch {
-      toast.error("Could not read image")
+      toast.error("Could not upload image")
     } finally {
       setBusy(false)
     }

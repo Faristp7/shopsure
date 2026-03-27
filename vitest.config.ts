@@ -1,4 +1,5 @@
 import { defineConfig } from "vitest/config";
+import path from "path";
 
 export default defineConfig({
   test: {
@@ -14,7 +15,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@": "/Users/faris/Documents/code/personal/shopsure/shopsure/src",
+      "@": path.resolve(__dirname, "./src"),
     },
   },
 });

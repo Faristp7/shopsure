@@ -34,13 +34,9 @@ import { BannerEditorDialog } from "./banner-editor-dialog"
 import { HomepagePreviewDialog } from "./homepage-preview-dialog"
 import { bannerToRecord, recordToBanner } from "./banner-mappers"
 import type { BannersWorkspace } from "./types"
-import {
-  INITIAL_CAROUSEL_IDS,
-  INITIAL_HERO_IDS,
-  INITIAL_STRIP_ROWS,
-  MOCK_BANNERS,
-} from "./initial-data"
 import { createDefaultBanner, generateId } from "./utils"
+import { bannerService } from "@/lib/api/banner.service"
+import type { CreateBannerDto } from "@/lib/api/banner.service"
 
 type EditorContext =
   | { kind: "hero"; mode: "create" | "edit"; bannerId?: string }
@@ -49,35 +45,55 @@ type EditorContext =
 
 export function BannerManagement() {
   const [loading, setLoading] = React.useState(true)
-  const [banners, setBanners] = React.useState<Record<string, BannerRecord>>(() => ({ ...MOCK_BANNERS }))
-  const [heroIds, setHeroIds] = React.useState<string[]>(() => [...INITIAL_HERO_IDS])
-  const [carouselIds, setCarouselIds] = React.useState<string[]>(() => [...INITIAL_CAROUSEL_IDS])
-  const [stripRows, setStripRows] = React.useState<CategoryStripRow[]>(() =>
-    INITIAL_STRIP_ROWS.map((r) => ({ ...r, bannerIds: [...r.bannerIds] }))
-  )
+  const [banners, setBanners] = React.useState<Record<string, BannerRecord>>({})
+  const [heroIds, setHeroIds] = React.useState<string[]>([])
+  const [carouselIds, setCarouselIds] = React.useState<string[]>([])
+  const [stripRows, setStripRows] = React.useState<CategoryStripRow[]>([])
 
   const [previewOpen, setPreviewOpen] = React.useState(false)
   const [editorOpen, setEditorOpen] = React.useState(false)
   const [editorCtx, setEditorCtx] = React.useState<EditorContext | null>(null)
   const [deleteId, setDeleteId] = React.useState<string | null>(null)
 
-  React.useEffect(() => {
-    const t = window.setTimeout(() => setLoading(false), 700)
-    return () => window.clearTimeout(t)
+  const fetchBanners = React.useCallback(async () => {
+    setLoading(true)
+    try {
+      const [hero, carousel, category] = await Promise.all([
+        bannerService.getBanners("HERO"),
+        bannerService.getBanners("CAROUSEL"),
+        bannerService.getBanners("CATEGORY"),
+      ])
+      
+      const newBanners: Record<string, BannerRecord> = {}
+      const addBanners = (list: BannerRecord[]) => {
+        list.forEach((b) => {
+          newBanners[b.id] = b
+        })
+      }
+      addBanners(hero)
+      addBanners(carousel)
+      addBanners(category)
+      setBanners(newBanners)
+      
+      setHeroIds(hero.map(b => b.id))
+      setCarouselIds(carousel.sort((a,b) => a.priority - b.priority).map(b => b.id))
+      
+      const categorySorted = category.sort((a,b) => a.priority - b.priority)
+      if (categorySorted.length > 0) {
+        setStripRows([{ id: 'strip_1', label: 'Category strip 1', bannerIds: categorySorted.map(b => b.id) }])
+      } else {
+        setStripRows([])
+      }
+    } catch {
+      toast.error("Failed to load banners")
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  const removeBannerEverywhere = (id: string) => {
-    setBanners((prev) => {
-      const next = { ...prev }
-      delete next[id]
-      return next
-    })
-    setHeroIds((ids) => ids.filter((x) => x !== id))
-    setCarouselIds((ids) => ids.filter((x) => x !== id))
-    setStripRows((rows) =>
-      rows.map((r) => ({ ...r, bannerIds: r.bannerIds.filter((x) => x !== id) }))
-    )
-  }
+  React.useEffect(() => {
+    fetchBanners()
+  }, [fetchBanners])
 
   const openCreate = (ctx: EditorContext) => {
     setEditorCtx(ctx)
@@ -106,83 +122,73 @@ export function BannerManagement() {
     return `Category strip · ${row?.label ?? "Row"}`
   }
 
-  const handleSaveBanner = (saved: Banner) => {
-    const record = bannerToRecord(saved)
+  const handleSaveBanner = async (saved: Banner) => {
     if (!editorCtx) return
+    const record = bannerToRecord(saved)
+    const slotMap = { hero: "HERO", carousel: "CAROUSEL", strip: "CATEGORY" } as const
+    const slot = slotMap[editorCtx.kind]
 
-    if (editorCtx.mode === "create" && editorCtx.kind === "hero") {
-      setBanners((prev) => {
-        const next = { ...prev, [record.id]: record }
-        const oldId = heroIds[0]
-        if (oldId) delete next[oldId]
-        return next
-      })
-      setHeroIds([record.id])
-      toast.success("Hero banner saved")
-      return
+    const dto: CreateBannerDto = {
+      title: record.headline,
+      subtitle: record.subheadline || undefined,
+      imageDesktop: record.imageDesktop,
+      imageMobile: record.imageMobile,
+      link: record.destinationUrl,
+      ctaText: record.ctaText || undefined,
+      status: record.status.toUpperCase() as any,
+      priority: record.priority || 0,
+      slot,
+      startAt: record.startsAt,
+      endAt: record.endsAt,
     }
 
-    setBanners((prev) => ({ ...prev, [record.id]: record }))
-
-    if (editorCtx.mode === "create") {
-      if (editorCtx.kind === "carousel") {
-        setCarouselIds((ids) => [...ids, record.id])
-      } else if (editorCtx.kind === "strip") {
-        const rowId = editorCtx.rowId
-        setStripRows((rows) =>
-          rows.map((r) =>
-            r.id === rowId ? { ...r, bannerIds: [...r.bannerIds, record.id] } : r
-          )
-        )
+    try {
+      if (editorCtx.mode === "create") {
+         await bannerService.createBanner(dto)
+         toast.success("Banner created")
+      } else if (editorCtx.mode === "edit" && editorCtx.bannerId) {
+         await bannerService.updateBanner(editorCtx.bannerId, dto)
+         toast.success("Banner updated")
       }
-      toast.success("Banner created")
-    } else {
-      toast.success("Banner updated")
+      await fetchBanners()
+    } catch {
+      toast.error("Failed to save banner")
     }
   }
 
-  const handleDuplicate = (id: string) => {
+  const handleDuplicate = async (id: string) => {
     const src = banners[id]
     if (!src) return
-    const copy = createDefaultBanner({
-      ...src,
-      id: generateId(),
-      headline: `${src.headline} (copy)`,
-      analytics: { clicks: 0, impressions: 0 },
-    })
 
-    if (heroIds.includes(id)) {
-      setBanners((prev) => {
-        const next = { ...prev, [copy.id]: copy }
-        delete next[id]
-        return next
-      })
-      setHeroIds([copy.id])
-    } else {
-      setBanners((prev) => ({ ...prev, [copy.id]: copy }))
-      if (carouselIds.includes(id)) {
-        setCarouselIds((ids) => {
-          const i = ids.indexOf(id)
-          const next = [...ids]
-          next.splice(i + 1, 0, copy.id)
-          return next
-        })
-      } else {
-        setStripRows((rows) =>
-          rows.map((r) => {
-            const i = r.bannerIds.indexOf(id)
-            if (i === -1) return r
-            const nextIds = [...r.bannerIds]
-            nextIds.splice(i + 1, 0, copy.id)
-            return { ...r, bannerIds: nextIds }
-          })
-        )
-      }
+    let slot: "HERO" | "CAROUSEL" | "CATEGORY" = "CAROUSEL"
+    if (heroIds.includes(id)) slot = "HERO"
+    else if (carouselIds.includes(id)) slot = "CAROUSEL"
+    else slot = "CATEGORY"
+
+    const dto: CreateBannerDto = {
+      title: `${src.headline} (copy)`,
+      subtitle: src.subheadline || undefined,
+      imageDesktop: src.imageDesktop,
+      imageMobile: src.imageMobile,
+      link: src.destinationUrl,
+      ctaText: src.ctaText || undefined,
+      status: "DRAFT",
+      priority: src.priority,
+      slot,
+      startAt: src.startsAt,
+      endAt: src.endsAt,
     }
-    toast.success("Banner duplicated")
+
+    try {
+      await bannerService.createBanner(dto)
+      toast.success("Banner duplicated")
+      await fetchBanners()
+    } catch {
+      toast.error("Failed to duplicate banner")
+    }
   }
 
-  const handleActivate = (id: string) => {
+  const handleActivate = async (id: string) => {
     const b = banners[id]
     if (!b) return
     const now = Date.now()
@@ -194,19 +200,54 @@ export function BannerManagement() {
     if (new Date(startsAt).getTime() > now) {
       startsAt = new Date(now).toISOString()
     }
-    setBanners((prev) => ({
-      ...prev,
-      [id]: { ...b, status: "active", startsAt, endsAt },
-    }))
-    toast.success("Banner activated")
+    try {
+      await bannerService.updateBannerStatus(id, {
+        status: "ACTIVE",
+        startAt: startsAt,
+        endAt: endsAt,
+      })
+      toast.success("Banner activated")
+      await fetchBanners()
+    } catch {
+      toast.error("Failed to activate banner")
+    }
   }
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (deleteId) {
-      removeBannerEverywhere(deleteId)
-      toast.success("Banner removed")
+      try {
+        await bannerService.deleteBanner(deleteId)
+        toast.success("Banner removed")
+        await fetchBanners()
+      } catch {
+        toast.error("Failed to delete banner")
+      }
     }
     setDeleteId(null)
+  }
+
+  const handleReorderCarousel = async (nextIds: string[]) => {
+    setCarouselIds(nextIds)
+    const items = nextIds.map((id, index) => ({ bannerId: id, priority: index }))
+    try {
+      await bannerService.reorderBanners({ items })
+    } catch {
+      toast.error("Failed to reorder banners")
+      await fetchBanners()
+    }
+  }
+
+  const handleCategoryReorder = async (rowId: string, nextIds: string[]) => {
+    setStripRows((rows) =>
+      rows.map((r) => (r.id === rowId ? { ...r, bannerIds: nextIds } : r))
+    )
+    const items = nextIds.map((id, index) => ({ bannerId: id, priority: index }))
+    try {
+      await bannerService.reorderBanners({ items })
+    } catch {
+      toast.error("Failed to reorder")
+      await fetchBanners()
+    }
   }
 
   const addStripRow = () => {
@@ -221,18 +262,16 @@ export function BannerManagement() {
     setStripRows((rows) => rows.map((r) => (r.id === rowId ? { ...r, label } : r)))
   }
 
-  const removeStripRow = (rowId: string) => {
-    setStripRows((rows) => {
-      const row = rows.find((r) => r.id === rowId)
-      if (!row) return rows
-      setBanners((prev) => {
-        const next = { ...prev }
-        for (const bid of row.bannerIds) delete next[bid]
-        return next
-      })
-      return rows.filter((r) => r.id !== rowId)
-    })
-    toast.message("Category strip removed")
+  const removeStripRow = async (rowId: string) => {
+    const row = stripRows.find((r) => r.id === rowId)
+    if (!row) return
+    try {
+      await Promise.all(row.bannerIds.map(id => bannerService.deleteBanner(id)))
+      toast.success("Category strip removed")
+      await fetchBanners()
+    } catch {
+      toast.error("Failed to remove strip completely")
+    }
   }
 
   const previewWorkspace = React.useMemo((): BannersWorkspace => {
@@ -344,7 +383,7 @@ export function BannerManagement() {
             <Reorder.Group
               axis="y"
               values={carouselIds}
-              onReorder={setCarouselIds}
+              onReorder={handleReorderCarousel}
               className="space-y-3"
               as="div"
             >
@@ -455,11 +494,7 @@ export function BannerManagement() {
                         <Reorder.Group
                           axis="y"
                           values={row.bannerIds}
-                          onReorder={(next) =>
-                            setStripRows((rows) =>
-                              rows.map((r) => (r.id === row.id ? { ...r, bannerIds: next } : r))
-                            )
-                          }
+                          onReorder={(next) => handleCategoryReorder(row.id, next)}
                           className="space-y-3"
                           as="div"
                         >

@@ -30,6 +30,9 @@ import { SortableBannerList } from "./sortable-banner-list"
 import { BannerEditorDialog } from "./banner-editor-dialog"
 import { HomepagePreviewDialog } from "./homepage-preview-dialog"
 import { BannersManagementSkeleton } from "./banners-skeleton"
+import { bannerService } from "@/lib/api/banner.service"
+import type { CreateBannerDto } from "@/lib/api/banner.service"
+import { bannerToRecord, recordToBanner } from "./banner-mappers"
 
 type EditorPlacement =
   | { kind: "hero" }
@@ -89,7 +92,7 @@ function EmptySlot({
 
 export function BannersManagement() {
   const [loading, setLoading] = useState(true)
-  const [workspace, setWorkspace] = useState<BannersWorkspace>(() => createInitialWorkspace())
+  const [workspace, setWorkspace] = useState<BannersWorkspace>({ hero: [], carousel: [], categoryStrips: [] })
   const [previewOpen, setPreviewOpen] = useState(false)
 
   const [editorOpen, setEditorOpen] = useState(false)
@@ -98,9 +101,32 @@ export function BannersManagement() {
 
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
 
+  const fetchWorkspace = async () => {
+    setLoading(true)
+    try {
+      const [heroRecord, carouselRecord, categoryRecord] = await Promise.all([
+        bannerService.getBanners("HERO"),
+        bannerService.getBanners("CAROUSEL"),
+        bannerService.getBanners("CATEGORY"),
+      ])
+      const hero = heroRecord.map(recordToBanner)
+      const carousel = carouselRecord.map(recordToBanner).sort((a,b) => a.priority - b.priority)
+      const categorySorted = categoryRecord.map(recordToBanner).sort((a,b) => a.priority - b.priority)
+      
+      setWorkspace({
+        hero,
+        carousel,
+        categoryStrips: categorySorted.length ? [{ id: "strip_1", label: "Category strip", banners: categorySorted }] : []
+      })
+    } catch {
+      toast.error("Failed to load banners")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
-    const t = window.setTimeout(() => setLoading(false), 700)
-    return () => window.clearTimeout(t)
+    fetchWorkspace()
   }, [])
 
   const editorSlotLabel = useMemo(() => {
@@ -128,130 +154,107 @@ export function BannersManagement() {
     setEditorOpen(true)
   }
 
-  function handleSaveBanner(banner: Banner) {
+  async function handleSaveBanner(banner: Banner) {
     if (!placement) return
-    setWorkspace((ws) => {
-      if (placement.kind === "hero") {
-        return { ...ws, hero: [banner] }
-      }
-      if (placement.kind === "carousel") {
-        const list = ws.carousel
-        const i = list.findIndex((b) => b.id === banner.id)
-        if (i >= 0) {
-          const next = [...list]
-          next[i] = banner
-          return { ...ws, carousel: next }
-        }
-        return { ...ws, carousel: [...list, banner] }
-      }
-      return {
-        ...ws,
-        categoryStrips: ws.categoryStrips.map((row) =>
-          row.id === placement.rowId
-            ? {
-                ...row,
-                banners: (() => {
-                  const idx = row.banners.findIndex((b) => b.id === banner.id)
-                  if (idx >= 0) {
-                    const n = [...row.banners]
-                    n[idx] = banner
-                    return n
-                  }
-                  return [...row.banners, banner]
-                })(),
-              }
-            : row
-        ),
-      }
-    })
-  }
+    const record = bannerToRecord(banner)
+    const slotMap = { hero: "HERO", carousel: "CAROUSEL", strip: "CATEGORY" } as const
+    const slot = slotMap[placement.kind]
+    const dto: CreateBannerDto = {
+      title: record.headline,
+      subtitle: record.subheadline || undefined,
+      imageDesktop: record.imageDesktop,
+      imageMobile: record.imageMobile,
+      link: record.destinationUrl,
+      ctaText: record.ctaText || undefined,
+      status: record.status.toUpperCase() as any,
+      priority: record.priority || 0,
+      slot,
+      startAt: record.startsAt,
+      endAt: record.endsAt,
+    }
 
-  function removeBannerFromWorkspace(target: DeleteTarget) {
-    setWorkspace((ws) => {
-      if (target.kind === "hero") {
-        return { ...ws, hero: ws.hero.filter((b) => b.id !== target.bannerId) }
+    try {
+      if (!editing) {
+        await bannerService.createBanner(dto)
+        toast.success("Banner created")
+      } else {
+        await bannerService.updateBanner(editing.id, dto)
+        toast.success("Banner updated")
       }
-      if (target.kind === "carousel") {
-        return {
-          ...ws,
-          carousel: ws.carousel.filter((b) => b.id !== target.bannerId),
-        }
-      }
-      if (target.kind === "stripRow") {
-        return {
-          ...ws,
-          categoryStrips: ws.categoryStrips.filter((r) => r.id !== target.rowId),
-        }
-      }
-      return {
-        ...ws,
-        categoryStrips: ws.categoryStrips.map((row) =>
-          row.id === target.rowId
-            ? { ...row, banners: row.banners.filter((b) => b.id !== target.bannerId) }
-            : row
-        ),
-      }
-    })
-    toast.success("Removed")
+      await fetchWorkspace()
+    } catch {
+      toast.error("Failed to save banner")
+    }
+    setEditorOpen(false)
   }
 
   function requestDelete(target: DeleteTarget) {
     setDeleteTarget(target)
   }
 
-  function confirmDelete() {
+  async function confirmDelete() {
     if (deleteTarget) {
-      removeBannerFromWorkspace(deleteTarget)
+      if (deleteTarget.kind === "stripRow") {
+         const row = workspace.categoryStrips.find(r => r.id === deleteTarget.rowId)
+         if (row) {
+            try {
+               await Promise.all(row.banners.map(b => bannerService.deleteBanner(b.id)))
+               toast.success("Row removed")
+               await fetchWorkspace()
+            } catch { toast.error("Failed to remove row completely") }
+         }
+      } else {
+         try {
+           await bannerService.deleteBanner(deleteTarget.bannerId)
+           toast.success("Removed")
+           await fetchWorkspace()
+         } catch { toast.error("Failed to delete banner") }
+      }
     }
     setDeleteTarget(null)
   }
 
-  function handleDuplicate(p: EditorPlacement, banner: Banner) {
-    const next = duplicateBanner(banner)
-    if (p.kind === "hero") {
-      setWorkspace((ws) => ({ ...ws, hero: [next] }))
-      toast.success("Hero duplicated as draft")
-      return
+  async function handleDuplicate(p: EditorPlacement, banner: Banner) {
+    const src = bannerToRecord(banner)
+    const slotMap = { hero: "HERO", carousel: "CAROUSEL", strip: "CATEGORY" } as const
+    const slot = slotMap[p.kind]
+    const dto: CreateBannerDto = {
+      title: `${src.headline} (copy)`,
+      subtitle: src.subheadline || undefined,
+      imageDesktop: src.imageDesktop,
+      imageMobile: src.imageMobile,
+      link: src.destinationUrl,
+      ctaText: src.ctaText || undefined,
+      status: "DRAFT",
+      priority: src.priority,
+      slot,
+      startAt: src.startsAt,
+      endAt: src.endsAt,
     }
-    if (p.kind === "carousel") {
-      setWorkspace((ws) => ({ ...ws, carousel: [...ws.carousel, next] }))
-      toast.success("Duplicated to carousel")
-      return
+
+    try {
+      await bannerService.createBanner(dto)
+      toast.success("Banner duplicated")
+      await fetchWorkspace()
+    } catch {
+      toast.error("Failed to duplicate banner")
     }
-    setWorkspace((ws) => ({
-      ...ws,
-      categoryStrips: ws.categoryStrips.map((row) =>
-        row.id === p.rowId ? { ...row, banners: [...row.banners, next] } : row
-      ),
-    }))
-    toast.success("Duplicated into strip")
   }
 
-  function handleActivate(p: EditorPlacement, banner: Banner) {
+  async function handleActivate(p: EditorPlacement, banner: Banner) {
     const next = activateBanner(banner)
-    setWorkspace((ws) => {
-      if (p.kind === "hero") {
-        return { ...ws, hero: ws.hero.map((b) => (b.id === next.id ? next : b)) }
-      }
-      if (p.kind === "carousel") {
-        return {
-          ...ws,
-          carousel: ws.carousel.map((b) => (b.id === next.id ? next : b)),
-        }
-      }
-      return {
-        ...ws,
-        categoryStrips: ws.categoryStrips.map((row) =>
-          row.id === p.rowId
-            ? {
-                ...row,
-                banners: row.banners.map((b) => (b.id === next.id ? next : b)),
-              }
-            : row
-        ),
-      }
-    })
-    toast.success("Banner activated")
+    if (!next.id) return
+    try {
+      await bannerService.updateBannerStatus(next.id, {
+        status: "ACTIVE",
+        startAt: next.startAt,
+        endAt: next.endAt
+      })
+      toast.success("Banner activated")
+      await fetchWorkspace()
+    } catch {
+      toast.error("Failed to activate")
+    }
   }
 
   function addStripRow() {
@@ -306,7 +309,17 @@ export function BannersManagement() {
           <CardContent>
             <SortableBannerList
               banners={workspace.hero}
-              onReorder={(next) => setWorkspace((ws) => ({ ...ws, hero: next }))}
+              onReorder={async (next) => {
+                setWorkspace((ws) => ({ ...ws, hero: next }))
+                // Wait, hero only allows 1 banner typically, but Reorder is supported
+                const items = next.map((b, i) => ({ bannerId: b.id, priority: i }))
+                try {
+                  await bannerService.reorderBanners({ items })
+                } catch {
+                  toast.error("Failed to reorder hero")
+                  await fetchWorkspace()
+                }
+              }}
               onEdit={(b) => openEdit({ kind: "hero" }, b)}
               onDelete={(b) => requestDelete({ kind: "hero", bannerId: b.id })}
               onDuplicate={(b) => handleDuplicate({ kind: "hero" }, b)}
@@ -349,7 +362,16 @@ export function BannersManagement() {
           <CardContent>
             <SortableBannerList
               banners={workspace.carousel}
-              onReorder={(next) => setWorkspace((ws) => ({ ...ws, carousel: next }))}
+              onReorder={async (next) => {
+                setWorkspace((ws) => ({ ...ws, carousel: next }))
+                const items = next.map((b, i) => ({ bannerId: b.id, priority: i }))
+                try {
+                  await bannerService.reorderBanners({ items })
+                } catch {
+       toast.error("Failed to reorder")
+       await fetchWorkspace()
+                }
+              }}
               onEdit={(b) => openEdit({ kind: "carousel" }, b)}
               onDelete={(b) => requestDelete({ kind: "carousel", bannerId: b.id })}
               onDuplicate={(b) => handleDuplicate({ kind: "carousel" }, b)}
@@ -434,14 +456,21 @@ export function BannersManagement() {
                 <CardContent>
                   <SortableBannerList
                     banners={row.banners}
-                    onReorder={(next) =>
+                    onReorder={async (next) => {
                       setWorkspace((ws) => ({
                         ...ws,
                         categoryStrips: ws.categoryStrips.map((r) =>
                           r.id === row.id ? { ...r, banners: next } : r
                         ),
                       }))
-                    }
+                      const items = next.map((b, i) => ({ bannerId: b.id, priority: i }))
+                      try {
+                        await bannerService.reorderBanners({ items })
+                      } catch {
+                        toast.error("Failed to reorder")
+                        await fetchWorkspace()
+                      }
+                    }}
                     onEdit={(b) => openEdit({ kind: "strip", rowId: row.id }, b)}
                     onDelete={(b) => requestDelete({ kind: "strip", rowId: row.id, bannerId: b.id })}
                     onDuplicate={(b) => handleDuplicate({ kind: "strip", rowId: row.id }, b)}

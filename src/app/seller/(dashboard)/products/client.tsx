@@ -140,6 +140,7 @@ export default function ProductsClient() {
         page: 1,
         limit: 20,
       }),
+    staleTime: 60 * 1000,
   });
 
   const baseProducts: Product[] =

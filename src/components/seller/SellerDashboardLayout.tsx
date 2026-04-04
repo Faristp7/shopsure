@@ -20,6 +20,8 @@ import {
 import { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { authService } from "@/services/auth.service";
+import { useQuery } from "@tanstack/react-query";
+import { sellerSettingsService } from "@/services/seller-settings.service";
 
 const navItems = [
   {
@@ -53,6 +55,15 @@ export default function SellerDashboardLayout({
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+
+  const { data: settingsData } = useQuery({
+    queryKey: ["seller-settings"],
+    queryFn: sellerSettingsService.getSettings,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const brandName = settingsData?.brand.brandName;
+  const brandInitial = brandName?.[0]?.toUpperCase() ?? "S";
 
   const isActive = (href: string, end?: boolean) =>
     end ? pathname === href : pathname.startsWith(href);
@@ -254,7 +265,7 @@ export default function SellerDashboardLayout({
           <div className="hidden lg:block">
             <p className="text-sm text-muted-foreground">Welcome back,</p>
             <p className="text-sm font-semibold text-foreground">
-              Priya's Boutique
+              {brandName ?? "—"}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -266,7 +277,7 @@ export default function SellerDashboardLayout({
               <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />
             </button>
             <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-              P
+              {brandInitial}
             </div>
           </div>
         </header>

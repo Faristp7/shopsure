@@ -20,14 +20,38 @@ import {
   Bell,
   ShieldAlert,
   Instagram,
-  Globe,
-  Mail,
-  Phone,
   Save,
   Trash2,
+  Loader2,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { sellerSettingsService } from "@/services/seller-settings.service";
 
 export default function SettingsPage() {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["seller-settings"],
+    queryFn: sellerSettingsService.getSettings,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-sm text-muted-foreground">Failed to load settings.</p>
+      </div>
+    );
+  }
+
+  const { brand, pickupAddress } = data!;
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
@@ -68,7 +92,7 @@ export default function SettingsPage() {
                     Brand Name
                   </Label>
                   <Input
-                    defaultValue="Priya's Boutique"
+                    defaultValue={brand.brandName}
                     className="h-11 font-bold border-border/60"
                   />
                 </div>
@@ -81,7 +105,7 @@ export default function SettingsPage() {
                       <Instagram className="h-4 w-4" />
                     </span>
                     <Input
-                      defaultValue="priyasboutique"
+                      defaultValue={brand.instagramUrl}
                       className="pl-10 h-11 font-bold border-border/60"
                     />
                   </div>
@@ -92,6 +116,7 @@ export default function SettingsPage() {
                   Store Biography
                 </Label>
                 <Textarea
+                  defaultValue={brand.brandDescription}
                   placeholder="Tell buyers what makes your brand unique..."
                   className="min-h-[100px] font-medium border-border/60"
                 />
@@ -102,7 +127,7 @@ export default function SettingsPage() {
                     Contact Email
                   </Label>
                   <Input
-                    defaultValue="hello@priyasboutique.com"
+                    defaultValue={brand.publicEmail}
                     className="h-11 font-bold border-border/60"
                   />
                 </div>
@@ -111,7 +136,7 @@ export default function SettingsPage() {
                     Contact Phone
                   </Label>
                   <Input
-                    defaultValue="+91 98765 43210"
+                    defaultValue={brand.publicPhone}
                     className="h-11 font-bold border-border/60"
                   />
                 </div>
@@ -142,7 +167,9 @@ export default function SettingsPage() {
                   Flat / Building / Street
                 </Label>
                 <Textarea
-                  defaultValue="123 Fashion Street, Linking Road, Bandra West"
+                  defaultValue={[pickupAddress.addressLine1, pickupAddress.addressLine2]
+                    .filter(Boolean)
+                    .join(", ")}
                   className="min-h-[80px] font-bold border-border/60"
                 />
               </div>
@@ -152,7 +179,7 @@ export default function SettingsPage() {
                     City
                   </Label>
                   <Input
-                    defaultValue="Mumbai"
+                    defaultValue={pickupAddress.city}
                     className="h-11 font-bold border-border/60"
                   />
                 </div>
@@ -161,7 +188,7 @@ export default function SettingsPage() {
                     State
                   </Label>
                   <Input
-                    defaultValue="Maharashtra"
+                    defaultValue={pickupAddress.state}
                     className="h-11 font-bold border-border/60"
                   />
                 </div>
@@ -170,7 +197,7 @@ export default function SettingsPage() {
                     Pincode
                   </Label>
                   <Input
-                    defaultValue="400050"
+                    defaultValue={pickupAddress.pincode}
                     className="h-11 font-bold border-border/60"
                   />
                 </div>

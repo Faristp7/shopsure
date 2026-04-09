@@ -203,6 +203,70 @@ export interface ProductFormErrors {
   [key: string]: string | undefined;
 }
 
+// --- Buyer product detail type ---
+
+export interface BuyerProductDetail {
+  id: string;
+  title: string;
+  description: string | null;
+  brand: string | null;
+  sku: string;
+  price: string;
+  originalPrice: string | null;
+  stock: number;
+  tags: string[] | null;
+  images: Array<{ url: string; isCover: boolean; sortOrder: number }> | null;
+  variants: Array<{ type: string; value: string; stock: number; price: number }> | null;
+  attributes: Array<{ name: string; value: string }> | null;
+  averageRating: string | null;
+  ratingCount: number;
+  status: string;
+  category: { id: string; name: string; slug: string } | null;
+  seller: { id: string; name: string };
+}
+
+// --- Buyer product listing types ---
+
+export interface BuyerProductImage {
+  url: string;
+  isCover: boolean;
+  sortOrder: number;
+}
+
+export interface BuyerProduct {
+  id: string;
+  title: string;
+  brand: string | null;
+  price: string;
+  originalPrice: string | null;
+  averageRating: string | null;
+  ratingCount: number;
+  images: BuyerProductImage[] | null;
+  status: string;
+  category: {
+    id: string;
+    name: string;
+    slug: string;
+  } | null;
+}
+
+export interface ListBuyerProductsQuery {
+  search?: string;
+  categoryId?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface ListBuyerProductsResponse {
+  items: BuyerProduct[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
 // --- Category tree ---
 
 export interface CategoryTreeNode extends Category {

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
-import { ArrowLeft, Heart, Star, Package, Truck, CalendarCheck, Percent } from "lucide-react";
+import { ArrowLeft, Heart, Star, Package, Truck, CalendarCheck, Percent, ShoppingBag, Check, Loader2, BellRing } from "lucide-react";
 import { useCart } from "../../context/CartContext";
 import {
   Accordion,
@@ -70,8 +70,11 @@ function ProductGallery({
 
 // ─── Info ────────────────────────────────────────────────────────────────────
 
+type AddStatus = "idle" | "loading" | "success" | "error";
+
 function ProductInfo({ product }: { product: BuyerProductDetail }) {
   const [wishlisted, setWishlisted] = useState(false);
+  const [addStatus, setAddStatus] = useState<AddStatus>("idle");
   const { addItem } = useCart();
 
   const price = parseFloat(product.price);
@@ -85,13 +88,13 @@ function ProductInfo({ product }: { product: BuyerProductDetail }) {
 
   const variants = Array.isArray(product.variants) ? product.variants : [];
   const variantTypes = [...new Set(variants.map((v) => v.type))];
-  const [selectedVariants, setSelectedVariants] = useState<
-    Record<string, string>
-  >(() => {
+  const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>(() => {
     const defaults: Record<string, string> = {};
     variantTypes.forEach((type) => {
+      // Default to first in-stock option, or just first if all are out
+      const inStock = variants.find((v) => v.type === type && v.stock > 0);
       const first = variants.find((v) => v.type === type);
-      if (first) defaults[type] = first.value;
+      if (inStock ?? first) defaults[type] = (inStock ?? first)!.value;
     });
     return defaults;
   });
@@ -100,13 +103,29 @@ function ProductInfo({ product }: { product: BuyerProductDetail }) {
     .map((type) => `${type}: ${selectedVariants[type]}`)
     .join(" / ");
 
-  const handleAddToCart = () => {
+  // ── Effective stock: minimum across all selected variant options ──────────
+  // Each variant entry has its own stock (e.g. Color:Red stock=0, Size:M stock=5)
+  const selectedVariantEntries = variantTypes
+    .map((type) => variants.find((v) => v.type === type && v.value === selectedVariants[type]))
+    .filter(Boolean) as Array<{ type: string; value: string; stock: number; price: number }>;
+
+  const effectiveStock =
+    selectedVariantEntries.length > 0
+      ? Math.min(...selectedVariantEntries.map((v) => v.stock))
+      : product.stock;
+
+  const isOutOfStock = effectiveStock === 0;
+  const isLowStock = effectiveStock > 0 && effectiveStock <= 5;
+
+  const handleAddToCart = useCallback(async () => {
+    if (addStatus !== "idle" || isOutOfStock) return;
     const coverImage =
       Array.isArray(product.images)
         ? (product.images.find((img) => img.isCover) ?? product.images[0])?.url
         : undefined;
 
-    addItem({
+    setAddStatus("loading");
+    const ok = await addItem({
       id: product.id,
       name: product.title,
       price,
@@ -114,8 +133,11 @@ function ProductInfo({ product }: { product: BuyerProductDetail }) {
       quantity: 1,
       variant: selectedVariantLabel || undefined,
       image: coverImage ?? "",
+      stock: effectiveStock,
     });
-  };
+    setAddStatus(ok ? "success" : "error");
+    setTimeout(() => setAddStatus("idle"), 1800);
+  }, [addStatus, isOutOfStock, addItem, product, price, originalPrice, selectedVariantLabel, effectiveStock]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -174,45 +196,59 @@ function ProductInfo({ product }: { product: BuyerProductDetail }) {
         </div>
       </div>
 
-      {/* Stock badge */}
-      <div>
-        {product.stock > 0 ? (
-          <span className="text-xs font-medium text-success bg-success/10 px-3 py-1 rounded-full">
-            In Stock ({product.stock} available)
-          </span>
-        ) : (
+      {/* Stock badge — reflects selected variant */}
+      <div className="flex items-center gap-2">
+        {isOutOfStock ? (
           <span className="text-xs font-medium text-destructive bg-destructive/10 px-3 py-1 rounded-full">
             Out of Stock
+          </span>
+        ) : isLowStock ? (
+          <>
+            <span className="text-xs font-medium text-warning bg-warning/10 px-3 py-1 rounded-full">
+              Only {effectiveStock} left!
+            </span>
+            <span className="text-xs text-muted-foreground">Order soon</span>
+          </>
+        ) : (
+          <span className="text-xs font-medium text-success bg-success/10 px-3 py-1 rounded-full">
+            In Stock ({effectiveStock} available)
           </span>
         )}
       </div>
 
       {/* Variants */}
       {variantTypes.map((type) => {
-        const values = variants
-          .filter((v) => v.type === type)
-          .map((v) => v.value);
+        const options = variants.filter((v) => v.type === type);
         return (
           <div key={type}>
             <p className="text-sm font-medium text-foreground mb-3">
               Select {type}
             </p>
             <div className="flex gap-2 flex-wrap">
-              {values.map((val) => (
-                <button
-                  key={val}
-                  onClick={() =>
-                    setSelectedVariants((prev) => ({ ...prev, [type]: val }))
-                  }
-                  className={`px-4 h-11 rounded-xl text-sm font-medium transition-all duration-200 ${
-                    selectedVariants[type] === val
-                      ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-                      : "bg-card text-muted-foreground hover:bg-secondary border border-border shadow-card"
-                  }`}
-                >
-                  {val}
-                </button>
-              ))}
+              {options.map((opt) => {
+                const isSelected = selectedVariants[type] === opt.value;
+                const isVariantOOS = opt.stock === 0;
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => {
+                      if (!isVariantOOS)
+                        setSelectedVariants((prev) => ({ ...prev, [type]: opt.value }));
+                    }}
+                    disabled={isVariantOOS}
+                    title={isVariantOOS ? "Out of stock" : undefined}
+                    className={`relative px-4 h-11 rounded-xl text-sm font-medium transition-all duration-200
+                      ${isVariantOOS
+                        ? "bg-muted text-muted-foreground border border-border cursor-not-allowed opacity-50 line-through"
+                        : isSelected
+                        ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                        : "bg-card text-muted-foreground hover:bg-secondary border border-border shadow-card"
+                      }`}
+                  >
+                    {opt.value}
+                  </button>
+                );
+              })}
             </div>
           </div>
         );
@@ -221,13 +257,56 @@ function ProductInfo({ product }: { product: BuyerProductDetail }) {
       {/* Actions */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-3">
-          <button
-            onClick={handleAddToCart}
-            disabled={product.stock === 0}
-            className="flex-1 bg-primary text-primary-foreground font-semibold py-3.5 rounded-full text-sm hover:opacity-90 transition-opacity active:scale-[0.98] shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Add to Cart
-          </button>
+          {/* Add to Cart / Out of Stock button */}
+          <div className="relative flex-1">
+            {addStatus === "success" && (
+              <span className="absolute inset-0 rounded-full pointer-events-none [animation:add-ripple_0.6s_ease_forwards] bg-green-400/25" />
+            )}
+            <button
+              onClick={handleAddToCart}
+              disabled={isOutOfStock || addStatus !== "idle"}
+              className={`w-full font-semibold py-3.5 rounded-full text-sm transition-all duration-300 shadow-lg
+                ${isOutOfStock
+                  // Distinct out-of-stock style — not faded primary
+                  ? "bg-muted text-muted-foreground shadow-none cursor-not-allowed"
+                  : addStatus === "success"
+                  ? "bg-green-500 text-white shadow-green-500/25 [animation:add-success-pop_0.35s_ease]"
+                  : addStatus === "error"
+                  ? "bg-destructive text-white shadow-destructive/25 active:scale-[0.98]"
+                  : addStatus === "loading"
+                  ? "bg-primary/80 text-primary-foreground shadow-primary/20 cursor-wait"
+                  : "bg-primary text-primary-foreground shadow-primary/20 hover:opacity-90 active:scale-[0.98]"
+                }`}
+            >
+              {isOutOfStock ? (
+                <span className="flex items-center justify-center gap-2">
+                  <BellRing className="w-4 h-4" />
+                  Out of Stock
+                </span>
+              ) : addStatus === "loading" ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Adding…
+                </span>
+              ) : addStatus === "success" ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Check className="w-4 h-4 stroke-[2.5]" />
+                  Added to Cart!
+                </span>
+              ) : addStatus === "error" ? (
+                <span className="flex items-center justify-center gap-2">
+                  <ShoppingBag className="w-4 h-4" />
+                  Try Again
+                </span>
+              ) : (
+                <span className="flex items-center justify-center gap-2">
+                  <ShoppingBag className="w-4 h-4" />
+                  Add to Cart
+                </span>
+              )}
+            </button>
+          </div>
+
           <button
             onClick={() => setWishlisted(!wishlisted)}
             className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 border shadow-card ${
@@ -240,11 +319,17 @@ function ProductInfo({ product }: { product: BuyerProductDetail }) {
             <Heart className={`w-5 h-5 ${wishlisted ? "fill-current" : ""}`} />
           </button>
         </div>
+
+        {/* Buy Now — also disabled + distinct style when OOS */}
         <button
-          disabled={product.stock === 0}
-          className="w-full border border-primary text-foreground font-semibold py-3.5 rounded-full text-sm hover:bg-primary hover:text-primary-foreground transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={isOutOfStock}
+          className={`w-full font-semibold py-3.5 rounded-full text-sm transition-all active:scale-[0.98]
+            ${isOutOfStock
+              ? "border border-border text-muted-foreground bg-muted cursor-not-allowed"
+              : "border border-primary text-foreground hover:bg-primary hover:text-primary-foreground"
+            }`}
         >
-          Buy Now
+          {isOutOfStock ? "Currently Unavailable" : "Buy Now"}
         </button>
       </div>
     </div>
@@ -368,21 +453,28 @@ interface Props {
 
 export default function ProductDetailClient({ product, relatedProducts }: Props) {
   const { addItem } = useCart();
+  const [mobileAddStatus, setMobileAddStatus] = useState<AddStatus>("idle");
   const price = parseFloat(product.price);
+  const mobileIsOOS = product.stock === 0;
 
   const images = Array.isArray(product.images) ? product.images : [];
   const attributes = Array.isArray(product.attributes) ? product.attributes : [];
 
-  const handleMobileAddToCart = () => {
+  const handleMobileAddToCart = useCallback(async () => {
+    if (mobileAddStatus !== "idle" || mobileIsOOS) return;
     const coverImage = images.find((img) => img.isCover)?.url ?? images[0]?.url;
-    addItem({
+    setMobileAddStatus("loading");
+    const ok = await addItem({
       id: product.id,
       name: product.title,
       price,
       quantity: 1,
       image: coverImage ?? "",
+      stock: product.stock,
     });
-  };
+    setMobileAddStatus(ok ? "success" : "error");
+    setTimeout(() => setMobileAddStatus("idle"), 1800);
+  }, [mobileAddStatus, mobileIsOOS, addItem, images, product, price]);
 
   return (
     <div className="min-h-screen bg-background pb-20 lg:pb-0">
@@ -511,20 +603,49 @@ export default function ProductDetailClient({ product, relatedProducts }: Props)
       <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border p-4 lg:hidden z-40 shadow-up">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-bold text-foreground">
-              ₹{price.toFixed(2)}
+            <p className={`text-sm font-bold ${mobileIsOOS ? "text-muted-foreground" : "text-foreground"}`}>
+              {mobileIsOOS ? "Unavailable" : `₹${price.toFixed(2)}`}
             </p>
             <p className="text-xs text-muted-foreground line-clamp-1">
               {product.title}
             </p>
           </div>
-          <button
-            onClick={handleMobileAddToCart}
-            disabled={product.stock === 0}
-            className="bg-primary text-primary-foreground font-semibold py-3 px-8 rounded-2xl text-sm hover:opacity-90 transition-opacity active:scale-[0.98] disabled:opacity-50"
-          >
-            Add to Cart
-          </button>
+          <div className="relative">
+            {mobileAddStatus === "success" && (
+              <span className="absolute inset-0 rounded-2xl pointer-events-none [animation:add-ripple_0.6s_ease_forwards] bg-green-400/25" />
+            )}
+            <button
+              onClick={handleMobileAddToCart}
+              disabled={mobileIsOOS || mobileAddStatus !== "idle"}
+              className={`font-semibold py-3 px-6 rounded-2xl text-sm transition-all duration-300 disabled:cursor-not-allowed
+                ${mobileIsOOS
+                  ? "bg-muted text-muted-foreground shadow-none"
+                  : mobileAddStatus === "success"
+                  ? "bg-green-500 text-white [animation:add-success-pop_0.35s_ease] active:scale-[0.98]"
+                  : mobileAddStatus === "loading"
+                  ? "bg-primary/80 text-primary-foreground cursor-wait"
+                  : mobileAddStatus === "error"
+                  ? "bg-destructive text-white active:scale-[0.98]"
+                  : "bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.98]"
+                }`}
+            >
+              {mobileIsOOS ? (
+                <span className="flex items-center gap-2">
+                  <BellRing className="w-4 h-4" /> Out of Stock
+                </span>
+              ) : mobileAddStatus === "loading" ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Adding…
+                </span>
+              ) : mobileAddStatus === "success" ? (
+                <span className="flex items-center gap-2">
+                  <Check className="w-4 h-4 stroke-[2.5]" /> Added!
+                </span>
+              ) : (
+                "Add to Cart"
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

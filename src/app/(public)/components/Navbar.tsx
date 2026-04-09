@@ -126,7 +126,12 @@ const Navbar = () => {
           <Link href="/cart" className="relative p-2 rounded-lg hover:bg-secondary transition-colors shrink-0" aria-label="Cart">
             <ShoppingBag className="w-5 h-5 text-foreground" />
             {itemCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary text-primary-foreground text-[10px] font-semibold rounded-full flex items-center justify-center">{itemCount}</span>
+              <span
+                key={itemCount}
+                className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary text-primary-foreground text-[10px] font-semibold rounded-full flex items-center justify-center [animation:cart-badge-bump_0.5s_ease]"
+              >
+                {itemCount}
+              </span>
             )}
           </Link>
         </div>

@@ -25,8 +25,8 @@ interface AuthContextType {
   user: UserProfile | null;
   addresses: Address[];
   wishlist: string[];
-  login: (email: string, password: string) => void;
-  signup: (name: string, email: string, password: string) => void;
+  login: (email: string, password: string) => Promise<boolean>;
+  signup: (name: string, email: string, password: string) => Promise<boolean>;
   logout: () => void;
   updateProfile: (profile: Partial<UserProfile>) => void;
   addAddress: (address: Omit<Address, "id">) => void;
@@ -54,16 +54,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [showLogin, setShowLogin] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
 
-  const login = (email: string, _password: string) => {
+  const login = async (email: string, _password: string) => {
     setUser({ name: "John Doe", email, phone: "+1 234 567 8900", avatar: "" });
     setIsLoggedIn(true);
     setShowLogin(false);
+    return true;
   };
 
-  const signup = (name: string, email: string, _password: string) => {
+  const signup = async (name: string, email: string, _password: string) => {
     setUser({ name, email, phone: "", avatar: "" });
     setIsLoggedIn(true);
     setShowSignup(false);
+    return true;
   };
 
   const logout = () => {

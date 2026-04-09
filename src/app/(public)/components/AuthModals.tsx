@@ -18,15 +18,17 @@ export const LoginModal = () => {
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (email && password) {
-      login(email, password);
-      const next = getSafeCallbackUrlForShop(
-        searchParams.get("callbackUrl"),
-        "/",
-      );
-      router.replace(next);
+      const success = await login(email, password);
+      if (success) {
+        const next = getSafeCallbackUrlForShop(
+          searchParams.get("callbackUrl"),
+          "/",
+        );
+        router.replace(next);
+      }
     }
   };
 
@@ -83,15 +85,17 @@ export const SignupModal = () => {
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (name && email && password) {
-      signup(name, email, password);
-      const next = getSafeCallbackUrlForShop(
-        searchParams.get("callbackUrl"),
-        "/",
-      );
-      router.replace(next);
+      const success = await signup(name, email, password);
+      if (success) {
+        const next = getSafeCallbackUrlForShop(
+          searchParams.get("callbackUrl"),
+          "/",
+        );
+        router.replace(next);
+      }
     }
   };
 

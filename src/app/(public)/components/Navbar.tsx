@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -49,7 +51,7 @@ const Navbar = () => {
     <>
       <header className="bg-card shadow-card sticky top-0 z-50">
         <div className="container flex items-center gap-4 py-3">
-          <Link href="/user" className="text-xl font-bold tracking-tight text-foreground hover:opacity-80 transition-opacity shrink-0">
+          <Link href="/" className="text-xl font-bold tracking-tight text-foreground hover:opacity-80 transition-opacity shrink-0">
             ShopSure
           </Link>
 
@@ -88,23 +90,23 @@ const Navbar = () => {
             <DropdownMenuContent align="end" className="w-52">
               {isLoggedIn ? (
                 <>
-                  <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => router.push("/user/profile")}>
+                  <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => router.push("/profile")}>
                     <User className="w-4 h-4" /> My Profile
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => router.push("/user/orders")}>
+                  <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => router.push("/orders")}>
                     <Package className="w-4 h-4" /> My Orders
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => router.push("/user/wishlist")}>
+                  <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => router.push("/wishlist")}>
                     <Heart className="w-4 h-4" /> Wishlist
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => router.push("/user/addresses")}>
+                  <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => router.push("/addresses")}>
                     <MapPin className="w-4 h-4" /> Addresses
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => router.push("/user/profile")}>
+                  <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => router.push("/profile")}>
                     <Settings className="w-4 h-4" /> Settings
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem className="gap-2 cursor-pointer text-destructive focus:text-destructive" onClick={() => { logout(); router.push("/user"); }}>
+                  <DropdownMenuItem className="gap-2 cursor-pointer text-destructive focus:text-destructive" onClick={() => { logout(); router.push("/"); }}>
                     <LogOut className="w-4 h-4" /> Sign Out
                   </DropdownMenuItem>
                 </>
@@ -121,7 +123,7 @@ const Navbar = () => {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Link href="/user/cart" className="relative p-2 rounded-lg hover:bg-secondary transition-colors shrink-0" aria-label="Cart">
+          <Link href="/cart" className="relative p-2 rounded-lg hover:bg-secondary transition-colors shrink-0" aria-label="Cart">
             <ShoppingBag className="w-5 h-5 text-foreground" />
             {itemCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary text-primary-foreground text-[10px] font-semibold rounded-full flex items-center justify-center">{itemCount}</span>

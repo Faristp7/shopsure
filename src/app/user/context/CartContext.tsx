@@ -1,5 +1,6 @@
 "use client";
 import { createContext, useContext, useState, ReactNode } from "react";
+import { apiService } from "@/services/api";
 
 export interface CartItem {
   id: string;
@@ -13,7 +14,7 @@ export interface CartItem {
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (item: CartItem) => void;
+  addItem: (item: CartItem) => Promise<void> | void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
@@ -51,7 +52,20 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     },
   ]);
 
-  const addItem = (item: CartItem) => {
+  const addItem = async (item: CartItem) => {
+    try {
+      // Attempt to save to backend
+      await apiService.post('/v1/cart/items', { 
+        productId: item.id, 
+        quantity: item.quantity 
+      });
+    } catch (error) {
+      console.error("Failed to add to cart API", error);
+      // Depending on requirements, we might not want to proceed if the API fails,
+      // but typically we'd show a toast here. Proceeding to update local UI for now
+      // or we can throw error to be handled by the component.
+    }
+
     setItems((prev) => {
       const existing = prev.find((i) => i.id === item.id);
       if (existing) {

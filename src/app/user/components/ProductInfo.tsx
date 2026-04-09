@@ -1,11 +1,37 @@
 import { useState } from "react";
 import { Heart, Clock } from "lucide-react";
+import { useCart } from "../context/CartContext";
+import { useRouter } from "next/navigation";
 
 const sizes = ["S", "M", "L", "XL", "XXL"];
 
 const ProductInfo = () => {
   const [selectedSize, setSelectedSize] = useState("S");
   const [wishlisted, setWishlisted] = useState(false);
+  const { addItem } = useCart();
+  const router = useRouter();
+
+  const product = {
+    id: "hoodie-1",
+    name: "Loose Fit Hoodie",
+    price: 24.99,
+    originalPrice: 49.99,
+    image: "", // Use appropriate image path if available
+  };
+
+  const handleAddToCart = () => {
+    debugger;
+    addItem({
+      ...product,
+      quantity: 1,
+      variant: `Black / ${selectedSize}`,
+    });
+  };
+
+  const handleBuyNow = () => {
+    handleAddToCart();
+    router.push("/user/cart");
+  };
 
   return (
     <div className="flex flex-col gap-5">
@@ -18,8 +44,8 @@ const ProductInfo = () => {
 
       {/* Title & Price */}
       <div>
-        <h2 className="text-2xl font-bold text-foreground">Loose Fit Hoodie</h2>
-        <p className="text-xl font-bold text-foreground mt-2">$24.99</p>
+        <h2 className="text-2xl font-bold text-foreground">{product.name}</h2>
+        <p className="text-xl font-bold text-foreground mt-2">${product.price}</p>
       </div>
 
       {/* Delivery */}
@@ -51,7 +77,10 @@ const ProductInfo = () => {
       {/* Add to cart & Buy now */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-3">
-          <button className="flex-1 bg-primary text-primary-foreground font-medium py-3.5 rounded-full text-sm hover:opacity-90 transition-opacity active:scale-[0.98]">
+          <button 
+            onClick={handleAddToCart}
+            className="flex-1 bg-primary text-primary-foreground font-medium py-3.5 rounded-full text-sm hover:opacity-90 transition-opacity active:scale-[0.98]"
+          >
             Add to Cart
           </button>
           <button
@@ -64,7 +93,10 @@ const ProductInfo = () => {
             <Heart className={`w-5 h-5 ${wishlisted ? "fill-current" : ""}`} />
           </button>
         </div>
-        <button className="w-full border border-primary text-foreground font-medium py-3.5 rounded-full text-sm hover:bg-primary hover:text-primary-foreground transition-all active:scale-[0.98]">
+        <button 
+          onClick={handleBuyNow}
+          className="w-full border border-primary text-foreground font-medium py-3.5 rounded-full text-sm hover:bg-primary hover:text-primary-foreground transition-all active:scale-[0.98]"
+        >
           Buy Now
         </button>
       </div>

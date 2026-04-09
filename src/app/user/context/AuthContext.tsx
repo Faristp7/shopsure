@@ -1,5 +1,7 @@
 "use client";
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import axios from "axios";
+import { toast } from "sonner";
 
 export interface Address {
   id: string;
@@ -54,21 +56,73 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [showLogin, setShowLogin] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
 
-  const login = (email: string, _password: string) => {
-    setUser({ name: "John Doe", email, phone: "+1 234 567 8900", avatar: "" });
-    setIsLoggedIn(true);
-    setShowLogin(false);
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+  // Check for stored token on mount
+  useEffect(() => {
+    const token = localStorage.getItem("auth_token");
+    const storedUser = localStorage.getItem("auth_user");
+    if (token && storedUser) {
+      setUser(JSON.parse(storedUser));
+      setIsLoggedIn(true);
+    }
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    try {
+      const response = await axios.post(`${API_URL}/v1/auth/login`, {
+        authMethod: "PASSWORD",
+        identifier: email,
+        password,
+      });
+
+      const { accessToken, user: userData } = response.data;
+      localStorage.setItem("auth_token", accessToken);
+      localStorage.setItem("auth_user", JSON.stringify(userData));
+      
+      setUser(userData);
+      setIsLoggedIn(true);
+      setShowLogin(false);
+      toast.success("Welcome back!");
+    } catch (error: any) {
+      const message = error.response?.data?.message || "Login failed. Please check your credentials.";
+      toast.error(message);
+      throw error;
+    }
   };
 
-  const signup = (name: string, email: string, _password: string) => {
-    setUser({ name, email, phone: "", avatar: "" });
-    setIsLoggedIn(true);
-    setShowSignup(false);
+  const signup = async (name: string, email: string, password: string) => {
+    try {
+      const response = await axios.post(`${API_URL}/v1/auth/register/buyer`, {
+        fullName: name,
+        email,
+        password,
+      });
+
+      // After registration, the backend returns the user object but usually not the tokens yet.
+      // Some backends auto-login. Assuming we might need to manually call login or if the backend returns tokens:
+      // Looking at AuthService, register returns { user }. We should probably auto-login if possible or just show login modal.
+      // However, most modern apps auto-login. Let's check AuthService.register again.
+      // Register returns { user }. It DOES NOT return tokens.
+      // So let's auto-login by calling the login function.
+      
+      toast.success("Account created successfully!");
+      await login(email, password);
+      setShowSignup(false);
+    } catch (error: any) {
+      console.log(error,'error');
+      const message = error.response?.data?.message || "Registration failed. Please try again.";
+      toast.error(message);
+      throw error;
+    }
   };
 
   const logout = () => {
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_user");
     setUser(null);
     setIsLoggedIn(false);
+    toast.info("Logged out successfully");
   };
 
   const updateProfile = (profile: Partial<UserProfile>) => {

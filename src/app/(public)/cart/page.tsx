@@ -2,16 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, X, Minus, Plus, RefreshCw } from "lucide-react";
 import { useCart } from "../context/CartContext";
 
-const imageMap: Record<string, string> = {
-  "hoodie-1": "/assets/user/hoodie-main.jpg",
-  "backpack-1": "/assets/user/deal-backpack.jpg",
-};
-
-export default function CartPage() {
+const CartPage = () => {
   const { items, removeItem, updateQuantity, total } = useCart();
+  const router = useRouter();
   const [coupon, setCoupon] = useState("");
   const [couponApplied, setCouponApplied] = useState(false);
 
@@ -21,19 +18,19 @@ export default function CartPage() {
   const grandTotal = subtotal + shipping + tax;
 
   return (
-    <div className="bg-background">
+    <div className="min-h-screen bg-background">
       <main className="container py-8">
         {/* Back link */}
-        <Link href="/user" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
+        <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
           <ArrowLeft className="w-4 h-4" /> Back
         </Link>
 
         <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-8 uppercase tracking-tight">Your Cart</h1>
 
         {items.length === 0 ? (
-          <div className="text-center py-20">
+          <div className="text-center py-20 bg-card rounded-3xl shadow-card">
             <p className="text-muted-foreground mb-4">Your cart is empty</p>
-            <Link href="/user" className="inline-flex items-center gap-2 bg-primary text-primary-foreground font-semibold px-6 py-3 rounded-full text-sm hover:opacity-90 transition-opacity">
+            <Link href="/" className="inline-flex items-center gap-2 bg-primary text-primary-foreground font-semibold px-6 py-3 rounded-full text-sm hover:opacity-90 transition-opacity">
               Continue Shopping
             </Link>
           </div>
@@ -56,7 +53,7 @@ export default function CartPage() {
                     {/* Image */}
                     <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden bg-secondary flex-shrink-0">
                       <img
-                        src={imageMap[item.id] || "/assets/user/hoodie-main.jpg"}
+                        src={item.image || "/assets/user/hoodie-main.jpg"}
                         alt={item.name}
                         className="w-full h-full object-cover"
                       />
@@ -156,12 +153,15 @@ export default function CartPage() {
                   <span className="text-base font-bold text-foreground">${grandTotal.toFixed(2)}</span>
                 </div>
 
-                <button className="w-full bg-primary text-primary-foreground font-semibold py-3.5 rounded-full text-sm mt-6 hover:opacity-90 transition-opacity active:scale-[0.98] uppercase tracking-wider">
+                <button
+                  onClick={() => router.push("/checkout")}
+                  className="w-full bg-primary text-primary-foreground font-semibold py-3.5 rounded-full text-sm mt-6 hover:opacity-90 transition-opacity active:scale-[0.98] uppercase tracking-wider shadow-lg shadow-primary/20"
+                >
                   Proceed to Checkout
                 </button>
 
                 <Link
-                  href="/user"
+                  href="/"
                   className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mt-4"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" /> Continue Shopping
@@ -173,4 +173,6 @@ export default function CartPage() {
       </main>
     </div>
   );
-}
+};
+
+export default CartPage;

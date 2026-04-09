@@ -1,6 +1,7 @@
 "use client";
 
 import { Star } from "lucide-react";
+import Link from "next/link";
 
 const products = [
   { name: "Polo with Contrast Trims", price: "$19.99", original: "$29.99", rating: 4.2, img: "/assets/user/product-polo.jpg" },
@@ -11,12 +12,16 @@ const products = [
 
 const RelatedProducts = () => (
   <section>
-    <h3 className="text-xl font-bold text-foreground mb-6">You might also like</h3>
+    <div className="flex items-center justify-between mb-6">
+      <h3 className="text-xl font-bold text-foreground">You might also like</h3>
+      <Link href="/products" className="text-sm text-primary hover:underline">View All</Link>
+    </div>
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {products.map((p) => (
-        <div
+        <Link
+          href="/product"
           key={p.name}
-          className="bg-card rounded-2xl shadow-card overflow-hidden group cursor-pointer hover:shadow-card-hover transition-shadow duration-300"
+          className="bg-card rounded-2xl shadow-card overflow-hidden group hover:shadow-card-hover transition-shadow duration-300"
         >
           <div className="aspect-[3/4] overflow-hidden">
             <img
@@ -36,14 +41,9 @@ const RelatedProducts = () => (
               {p.original && (
                 <span className="text-xs text-muted-foreground line-through">{p.original}</span>
               )}
-              {p.original && (
-                <span className="text-[10px] font-semibold bg-discount/10 text-discount px-1.5 py-0.5 rounded-md">
-                  Sale
-                </span>
-              )}
             </div>
           </div>
-        </div>
+        </Link>
       ))}
     </div>
   </section>

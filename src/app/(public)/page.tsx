@@ -1,9 +1,10 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { ArrowRight, Star, Truck, ShieldCheck, RotateCcw, Headphones, Zap, Gift, TrendingUp, Quote, Store, Clock, Heart, DollarSign, Package, BadgeCheck, Eye, Sparkles } from "lucide-react";
+import { ArrowRight, Star, Truck, ShieldCheck, RotateCcw, Headphones, Zap, Gift, TrendingUp, Quote, Store, Clock, Heart, DollarSign, Package, BadgeCheck, Eye, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
 
-// Use absolute paths for public assets
+// Asset paths
 const heroBanner = "/assets/user/hero-banner.jpg";
 const catElectronics = "/assets/user/cat-electronics.jpg";
 const catFashion = "/assets/user/cat-fashion.jpg";
@@ -20,11 +21,11 @@ const productPolo2 = "/assets/user/product-polo2.jpg";
 const productJacket = "/assets/user/product-jacket.jpg";
 
 const categories = [
-  { name: "Electronics", img: catElectronics },
-  { name: "Fashion", img: catFashion },
-  { name: "Home & Living", img: catHome },
-  { name: "Sports", img: catSports },
-  { name: "Beauty", img: catBeauty },
+  { name: "Electronics", slug: "electronics", img: catElectronics },
+  { name: "Fashion", slug: "fashion", img: catFashion },
+  { name: "Home & Living", slug: "home-living", img: catHome },
+  { name: "Sports", slug: "sports", img: catSports },
+  { name: "Beauty", slug: "beauty", img: catBeauty },
 ];
 
 const featuredProducts = [
@@ -98,29 +99,89 @@ const recentlyAddedProducts = [
   { name: "Bluetooth Speaker", price: "$39.99", daysAgo: 5, img: dealEarbuds },
 ];
 
-export default function UserHomePage() {
+const heroSlides = [
+  {
+    img: heroBanner,
+    subtitle: "New Collection 2024",
+    title: "Discover Everything You Need",
+    desc: "From electronics to fashion, home decor to sports gear — all in one place.",
+  },
+  {
+    img: catFashion,
+    subtitle: "Trending Now",
+    title: "Fashion Forward Styles",
+    desc: "Explore the latest trends in men's and women's fashion at unbeatable prices.",
+  },
+  {
+    img: catSports,
+    subtitle: "Stay Active",
+    title: "Gear Up for Adventure",
+    desc: "Premium sports and outdoor equipment for every athlete and adventurer.",
+  },
+];
+
+export default function Index() {
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  const nextSlide = useCallback(() => {
+    setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
+  }, []);
+
+  const prevSlide = () => {
+    setCurrentSlide((prev) => (prev - 1 + heroSlides.length) % heroSlides.length);
+  };
+
+  useEffect(() => {
+    const timer = setInterval(nextSlide, 5000);
+    return () => clearInterval(timer);
+  }, [nextSlide]);
+
   return (
-    <div className="bg-background">
-      {/* Hero */}
+    <div className="min-h-screen bg-background">
+      {/* Hero Carousel */}
       <section className="container py-8">
         <div className="relative rounded-2xl overflow-hidden">
-          <img src={heroBanner} alt="Shop everything" className="w-full h-[300px] sm:h-[420px] object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-r from-foreground/70 to-transparent flex items-center">
-            <div className="px-8 sm:px-12 max-w-lg">
-              <p className="text-primary-foreground/80 text-sm font-medium mb-2 tracking-wider uppercase">New Collection 2024</p>
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-primary-foreground leading-tight mb-4">
-                Discover Everything You Need
-              </h2>
-              <p className="text-primary-foreground/70 text-sm mb-6 leading-relaxed">
-                From electronics to fashion, home decor to sports gear — all in one place.
-              </p>
-              <Link
-                href="/user/product"
-                className="inline-flex items-center gap-2 bg-card text-foreground font-semibold px-6 py-3 rounded-full text-sm hover:opacity-90 transition-opacity"
-              >
-                Shop Now <ArrowRight className="w-4 h-4" />
-              </Link>
+          {heroSlides.map((slide, i) => (
+            <div
+              key={i}
+              className={`transition-opacity duration-700 ${i === currentSlide ? "opacity-100" : "opacity-0 absolute inset-0"}`}
+            >
+              <img src={slide.img} alt={slide.title} className="w-full h-[300px] sm:h-[420px] object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-r from-foreground/70 to-transparent flex items-center">
+                <div className="px-8 sm:px-12 max-w-lg">
+                  <p className="text-primary-foreground/80 text-sm font-medium mb-2 tracking-wider uppercase">{slide.subtitle}</p>
+                  <h2 className="text-3xl sm:text-4xl font-extrabold text-primary-foreground leading-tight mb-4">
+                    {slide.title}
+                  </h2>
+                  <p className="text-primary-foreground/70 text-sm mb-6 leading-relaxed">{slide.desc}</p>
+                  <Link
+                    href="/products"
+                    className="inline-flex items-center gap-2 bg-card text-foreground font-semibold px-6 py-3 rounded-full text-sm hover:opacity-90 transition-opacity"
+                  >
+                    Shop Now <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              </div>
             </div>
+          ))}
+
+          {/* Arrows */}
+          <button onClick={prevSlide} className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-card/80 backdrop-blur flex items-center justify-center hover:bg-card transition-colors z-10">
+            <ChevronLeft className="w-5 h-5 text-foreground" />
+          </button>
+          <button onClick={nextSlide} className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-card/80 backdrop-blur flex items-center justify-center hover:bg-card transition-colors z-10">
+            <ChevronRight className="w-5 h-5 text-foreground" />
+          </button>
+
+          {/* Dots */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+            {heroSlides.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrentSlide(i)}
+                className={`h-2 rounded-full transition-all duration-300 ${i === currentSlide ? "w-6 bg-primary-foreground" : "w-2 bg-primary-foreground/40"}`}
+              />
+            ))}
           </div>
         </div>
       </section>
@@ -150,19 +211,20 @@ export default function UserHomePage() {
             View All <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
           {categories.map((cat) => (
-            <div
+            <Link
+              href={`/category/${cat.slug}`}
               key={cat.name}
-              className="bg-card rounded-2xl shadow-card overflow-hidden group cursor-pointer hover:shadow-card-hover transition-shadow duration-300"
+              className="bg-card rounded-xl shadow-card overflow-hidden group cursor-pointer hover:shadow-card-hover transition-shadow duration-300"
             >
-              <div className="aspect-square overflow-hidden">
+              <div className="aspect-[4/3] overflow-hidden">
                 <img src={cat.img} alt={cat.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
               </div>
-              <div className="p-3 text-center">
-                <p className="text-sm font-semibold text-foreground">{cat.name}</p>
+              <div className="p-2 text-center">
+                <p className="text-xs font-semibold text-foreground">{cat.name}</p>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </section>
@@ -178,7 +240,7 @@ export default function UserHomePage() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {featuredProducts.map((p) => (
             <Link
-              href="/user/products"
+              href="/product"
               key={p.name}
               className="bg-card rounded-2xl shadow-card overflow-hidden group cursor-pointer hover:shadow-card-hover transition-shadow duration-300"
             >
@@ -215,7 +277,7 @@ export default function UserHomePage() {
           </div>
           <div className="grid sm:grid-cols-3 gap-4">
             {deals.map((d) => (
-              <Link href="/user/products" key={d.name} className="bg-card rounded-2xl overflow-hidden group hover:shadow-card-hover transition-shadow duration-300">
+              <Link href="/product" key={d.name} className="bg-card rounded-2xl overflow-hidden group hover:shadow-card-hover transition-shadow duration-300">
                 <div className="aspect-square overflow-hidden relative">
                   <img src={d.img} alt={d.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                   <span className="absolute top-3 left-3 bg-discount text-primary-foreground text-xs font-bold px-2.5 py-1 rounded-full">
@@ -240,7 +302,7 @@ export default function UserHomePage() {
         <h3 className="text-xl font-bold text-foreground mb-6">Explore What's Hot</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 grid-rows-2 gap-4 auto-rows-[200px] md:auto-rows-[220px]">
           {/* Large featured tile */}
-          <Link href="/user/products" className="col-span-2 row-span-2 relative rounded-2xl overflow-hidden group cursor-pointer">
+          <Link href="/product" className="col-span-2 row-span-2 relative rounded-2xl overflow-hidden group cursor-pointer">
             <img src={catFashion} alt="Fashion" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
             <div className="absolute inset-0 bg-gradient-to-t from-foreground/60 to-transparent" />
             <div className="absolute bottom-6 left-6">
@@ -251,7 +313,7 @@ export default function UserHomePage() {
           </Link>
 
           {/* Top right - small */}
-          <Link href="/user/products" className="relative rounded-2xl overflow-hidden group {cursor-pointer}">
+          <Link href="/product" className="relative rounded-2xl overflow-hidden group cursor-pointer">
             <img src={dealWatch} alt="Smart Watch" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
             <div className="absolute inset-0 bg-gradient-to-t from-foreground/50 to-transparent" />
             <div className="absolute bottom-4 left-4">
@@ -273,7 +335,7 @@ export default function UserHomePage() {
           </div>
 
           {/* Bottom right - small */}
-          <Link href="/user/products" className="relative rounded-2xl overflow-hidden group cursor-pointer">
+          <Link href="/product" className="relative rounded-2xl overflow-hidden group cursor-pointer">
             <img src={catSports} alt="Sports" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
             <div className="absolute inset-0 bg-gradient-to-t from-foreground/50 to-transparent" />
             <div className="absolute bottom-4 left-4">
@@ -282,6 +344,17 @@ export default function UserHomePage() {
             </div>
           </Link>
 
+          {/* Bottom right - gift card */}
+          <div className="bg-secondary rounded-2xl p-6 flex flex-col justify-between">
+            <Gift className="w-8 h-8 text-foreground" />
+            <div>
+              <h4 className="text-sm font-bold text-foreground">Gift Cards</h4>
+              <p className="text-xs text-muted-foreground mt-1">The perfect present</p>
+              <button className="mt-3 bg-primary text-primary-foreground text-xs font-semibold px-4 py-2 rounded-full hover:opacity-90 transition-opacity">
+                Buy Now
+              </button>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -297,9 +370,27 @@ export default function UserHomePage() {
             { name: "IKEA", slug: "ikea" },
             { name: "Zara", slug: "zara" },
           ].map((brand) => (
-            <Link href={`/user/brand/${brand.slug}`} key={brand.slug} className="bg-card rounded-2xl shadow-card p-6 flex items-center justify-center hover:shadow-card-hover transition-shadow duration-300 cursor-pointer">
+            <Link href={`/brand/${brand.slug}`} key={brand.slug} className="bg-card rounded-2xl shadow-card p-6 flex items-center justify-center hover:shadow-card-hover transition-shadow duration-300 cursor-pointer">
               <span className="text-sm font-bold text-muted-foreground tracking-wider">{brand.name}</span>
             </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* Stats / Social proof */}
+      <section className="container pb-12">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { value: "50K+", label: "Happy Customers", icon: Star },
+            { value: "10K+", label: "Products Listed", icon: Gift },
+            { value: "99%", label: "Satisfaction Rate", icon: TrendingUp },
+            { value: "150+", label: "Brands Available", icon: ShieldCheck },
+          ].map(({ value, label, icon: Icon }) => (
+            <div key={label} className="bg-card rounded-2xl shadow-card p-6 text-center">
+              <Icon className="w-6 h-6 text-muted-foreground mx-auto mb-3" />
+              <p className="text-2xl font-extrabold text-foreground">{value}</p>
+              <p className="text-xs text-muted-foreground mt-1">{label}</p>
+            </div>
           ))}
         </div>
       </section>
@@ -330,6 +421,164 @@ export default function UserHomePage() {
                 </div>
               </div>
             </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Trending Stores */}
+      <section className="container pb-12">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold text-foreground">Trending Stores</h3>
+          <button className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+            View All <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {trendingStores.map((store) => (
+            <div key={store.name} className="bg-card rounded-2xl shadow-card p-5 text-center hover:shadow-card-hover transition-shadow duration-300 cursor-pointer group">
+              <div className="w-14 h-14 rounded-2xl mx-auto mb-3 flex items-center justify-center text-primary-foreground font-bold text-lg" style={{ backgroundColor: store.color }}>
+                {store.name.charAt(0)}
+              </div>
+              <p className="text-sm font-semibold text-foreground">{store.name}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{store.category}</p>
+              <div className="flex items-center justify-center gap-1 mt-2">
+                <Star className="w-3 h-3 fill-star text-star" />
+                <span className="text-xs font-medium text-foreground">{store.rating}</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1">{store.products} products</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Top Rated Products */}
+      <section className="container pb-12">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold text-foreground">Top Rated Products</h3>
+          <button className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+            View All <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {topRatedProducts.map((p) => (
+            <Link href="/product" key={p.name} className="bg-card rounded-2xl shadow-card overflow-hidden group hover:shadow-card-hover transition-shadow duration-300">
+              <div className="aspect-square overflow-hidden relative">
+                <img src={p.img} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <span className="absolute top-3 left-3 bg-card/90 backdrop-blur-sm text-foreground text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
+                  <Star className="w-3 h-3 fill-star text-star" /> {p.rating}
+                </span>
+              </div>
+              <div className="p-4">
+                <p className="text-sm font-semibold text-foreground line-clamp-1">{p.name}</p>
+                <p className="text-xs text-muted-foreground mt-1">{p.reviews.toLocaleString()} reviews</p>
+                <p className="text-sm font-bold text-foreground mt-2">{p.price}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* Recently Viewed */}
+      <section className="container pb-12">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <Eye className="w-5 h-5 text-muted-foreground" />
+            <h3 className="text-xl font-bold text-foreground">Recently Viewed</h3>
+          </div>
+          <button className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+            Clear All
+          </button>
+        </div>
+        <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+          {recentlyViewed.map((p) => (
+            <Link href="/product" key={p.name} className="bg-card rounded-2xl shadow-card overflow-hidden flex-shrink-0 w-[160px] hover:shadow-card-hover transition-shadow duration-300 group">
+              <div className="aspect-square overflow-hidden">
+                <img src={p.img} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+              </div>
+              <div className="p-3">
+                <p className="text-xs font-semibold text-foreground line-clamp-1">{p.name}</p>
+                <p className="text-xs font-bold text-foreground mt-1">{p.price}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* Recommended For You */}
+      <section className="container pb-12">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-star" />
+            <h3 className="text-xl font-bold text-foreground">Recommended For You</h3>
+          </div>
+          <button className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+            View All <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {recommendedProducts.map((p) => (
+            <Link href="/product" key={p.name} className="bg-card rounded-2xl shadow-card overflow-hidden group hover:shadow-card-hover transition-shadow duration-300">
+              <div className="aspect-square overflow-hidden relative">
+                <img src={p.img} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <button className="absolute top-3 right-3 w-8 h-8 bg-card/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-card transition-colors">
+                  <Heart className="w-4 h-4 text-foreground" />
+                </button>
+              </div>
+              <div className="p-4">
+                <p className="text-sm font-semibold text-foreground line-clamp-1">{p.name}</p>
+                <div className="flex items-center gap-1 mt-1.5">
+                  <Star className="w-3.5 h-3.5 fill-star text-star" />
+                  <span className="text-xs text-muted-foreground">{p.rating}</span>
+                </div>
+                <p className="text-sm font-bold text-foreground mt-2">{p.price}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* Shop by Price */}
+      <section className="container pb-12">
+        <h3 className="text-xl font-bold text-foreground mb-6">Shop by Price</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {priceRanges.map((pr) => (
+            <div key={pr.label} className="bg-card rounded-2xl shadow-card p-6 text-center hover:shadow-card-hover transition-shadow duration-300 cursor-pointer group">
+              <span className="text-3xl mb-3 block">{pr.icon}</span>
+              <p className="text-base font-bold text-foreground">{pr.label}</p>
+              <p className="text-xs text-muted-foreground mt-1">{pr.count.toLocaleString()} products</p>
+              <div className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                Browse <ArrowRight className="w-3 h-3" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Recently Added Products */}
+      <section className="container pb-12">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <Package className="w-5 h-5 text-muted-foreground" />
+            <h3 className="text-xl font-bold text-foreground">Recently Added</h3>
+          </div>
+          <button className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+            View All <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {recentlyAddedProducts.map((p) => (
+            <Link href="/product" key={p.name} className="bg-card rounded-2xl shadow-card overflow-hidden group hover:shadow-card-hover transition-shadow duration-300">
+              <div className="aspect-square overflow-hidden relative">
+                <img src={p.img} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <span className="absolute top-3 left-3 bg-success text-primary-foreground text-[10px] font-bold px-2 py-1 rounded-full">
+                  {p.daysAgo === 1 ? "New today" : `${p.daysAgo}d ago`}
+                </span>
+              </div>
+              <div className="p-3">
+                <p className="text-xs font-semibold text-foreground line-clamp-1">{p.name}</p>
+                <p className="text-xs font-bold text-foreground mt-1">{p.price}</p>
+              </div>
+            </Link>
           ))}
         </div>
       </section>

@@ -17,19 +17,11 @@ export const LoginModal = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email && password) {
-      const success = await login(email, password);
-      if (success) {
-        const next = getSafeCallbackUrlForShop(
-          searchParams.get("callbackUrl"),
-          "/",
-        );
-        router.replace(next);
-      }
-    }
+    if (email && password) login(email, password);
   };
 
   return (
@@ -63,7 +55,9 @@ export const LoginModal = () => {
             </label>
             <button type="button" className="text-primary hover:underline">Forgot password?</button>
           </div>
-          <Button type="submit" className="w-full">Sign In</Button>
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? "Signing in..." : "Sign In"}
+          </Button>
           <p className="text-center text-sm text-muted-foreground">
             Don't have an account?{" "}
             <button type="button" onClick={() => { setShowLogin(false); setShowSignup(true); }} className="text-primary font-medium hover:underline">
@@ -84,19 +78,11 @@ export const SignupModal = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (name && email && password) {
-      const success = await signup(name, email, password);
-      if (success) {
-        const next = getSafeCallbackUrlForShop(
-          searchParams.get("callbackUrl"),
-          "/",
-        );
-        router.replace(next);
-      }
-    }
+    if (name && email && password) signup(name, email, password);
   };
 
   return (
@@ -131,7 +117,9 @@ export const SignupModal = () => {
               </button>
             </div>
           </div>
-          <Button type="submit" className="w-full">Create Account</Button>
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? "Creating account..." : "Create Account"}
+          </Button>
           <p className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}
             <button type="button" onClick={() => { setShowSignup(false); setShowLogin(true); }} className="text-primary font-medium hover:underline">

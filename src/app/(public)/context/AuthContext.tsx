@@ -1,5 +1,7 @@
 "use client";
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import axios from "axios";
+import { toast } from "sonner";
 
 export interface Address {
   id: string;
@@ -69,8 +71,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = () => {
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_user");
     setUser(null);
     setIsLoggedIn(false);
+    toast.info("Logged out successfully");
   };
 
   const updateProfile = (profile: Partial<UserProfile>) => {

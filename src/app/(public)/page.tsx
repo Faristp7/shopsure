@@ -1,11 +1,12 @@
-"use client";
-
-import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { ArrowRight, Star, Truck, ShieldCheck, RotateCcw, Headphones, Zap, Gift, TrendingUp, Quote, Store, Clock, Heart, DollarSign, Package, BadgeCheck, Eye, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
+import HeroCarousel from "@/components/public/home/HeroCarousel";
+import { homeService } from "@/lib/api/home.service";
+import { ProductCard } from "@/components/public/products/ProductCard";
+
+export const revalidate = 60; // Next.js caching: Add revalidation
 
 // Asset paths
-const heroBanner = "/assets/user/hero-banner.jpg";
 const catElectronics = "/assets/user/cat-electronics.jpg";
 const catFashion = "/assets/user/cat-fashion.jpg";
 const catHome = "/assets/user/cat-home.jpg";
@@ -20,45 +21,11 @@ const productTshirt = "/assets/user/product-tshirt.jpg";
 const productPolo2 = "/assets/user/product-polo2.jpg";
 const productJacket = "/assets/user/product-jacket.jpg";
 
-const categories = [
-  { name: "Electronics", slug: "electronics", img: catElectronics },
-  { name: "Fashion", slug: "fashion", img: catFashion },
-  { name: "Home & Living", slug: "home-living", img: catHome },
-  { name: "Sports", slug: "sports", img: catSports },
-  { name: "Beauty", slug: "beauty", img: catBeauty },
-];
-
-const featuredProducts = [
-  { name: "Wireless Headphones", price: "$49.99", original: "$79.99", rating: 4.6, img: catElectronics },
-  { name: "Leather Tote Bag", price: "$89.99", original: null, rating: 4.8, img: catFashion },
-  { name: "Desk Lamp", price: "$34.99", original: "$54.99", rating: 4.3, img: dealLamp },
-  { name: "Running Shoes", price: "$64.99", original: null, rating: 4.5, img: catSports },
-  { name: "Premium Backpack", price: "$44.99", original: "$59.99", rating: 4.4, img: dealBackpack },
-  { name: "Wireless Earbuds", price: "$29.99", original: null, rating: 4.7, img: dealEarbuds },
-  { name: "Polo Shirt", price: "$19.99", original: "$29.99", rating: 4.2, img: productPolo },
-  { name: "Striped Jacket", price: "$39.99", original: null, rating: 4.7, img: productJacket },
-];
-
-const deals = [
-  { name: "Premium Backpack", price: "$44.99", original: "$89.99", discount: "50%", img: dealBackpack },
-  { name: "Minimalist Desk Lamp", price: "$27.99", original: "$54.99", discount: "49%", img: dealLamp },
-  { name: "Wireless Earbuds Pro", price: "$24.99", original: "$49.99", discount: "50%", img: dealEarbuds },
-];
-
 const perks = [
   { icon: Truck, title: "Free Shipping", desc: "On orders over $50" },
   { icon: ShieldCheck, title: "Secure Payment", desc: "100% protected" },
   { icon: RotateCcw, title: "Easy Returns", desc: "30 day return policy" },
   { icon: Headphones, title: "24/7 Support", desc: "Dedicated support" },
-];
-
-const trendingStores = [
-  { name: "TechZone", category: "Electronics", rating: 4.9, products: 342, color: "hsl(var(--primary))" },
-  { name: "StyleHub", category: "Fashion", rating: 4.8, products: 518, color: "hsl(var(--discount))" },
-  { name: "HomeNest", category: "Home & Living", rating: 4.7, products: 215, color: "hsl(var(--success))" },
-  { name: "FitGear Pro", category: "Sports", rating: 4.6, products: 189, color: "hsl(var(--star))" },
-  { name: "GlowUp", category: "Beauty", rating: 4.8, products: 276, color: "hsl(var(--destructive))" },
-  { name: "GadgetWorld", category: "Electronics", rating: 4.5, products: 403, color: "hsl(var(--primary))" },
 ];
 
 const topRatedProducts = [
@@ -99,92 +66,22 @@ const recentlyAddedProducts = [
   { name: "Bluetooth Speaker", price: "$39.99", daysAgo: 5, img: dealEarbuds },
 ];
 
-const heroSlides = [
-  {
-    img: heroBanner,
-    subtitle: "New Collection 2024",
-    title: "Discover Everything You Need",
-    desc: "From electronics to fashion, home decor to sports gear — all in one place.",
-  },
-  {
-    img: catFashion,
-    subtitle: "Trending Now",
-    title: "Fashion Forward Styles",
-    desc: "Explore the latest trends in men's and women's fashion at unbeatable prices.",
-  },
-  {
-    img: catSports,
-    subtitle: "Stay Active",
-    title: "Gear Up for Adventure",
-    desc: "Premium sports and outdoor equipment for every athlete and adventurer.",
-  },
-];
+export default async function Index() {
+  const data = await homeService.getHome();
 
-export default function Index() {
-  const [currentSlide, setCurrentSlide] = useState(0);
-
-  const nextSlide = useCallback(() => {
-    setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
-  }, []);
-
-  const prevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + heroSlides.length) % heroSlides.length);
-  };
-
-  useEffect(() => {
-    const timer = setInterval(nextSlide, 5000);
-    return () => clearInterval(timer);
-  }, [nextSlide]);
+  const {
+    banners = [],
+    categories = [],
+    featuredProducts = [],
+    deals = [],
+    trending = [],
+    brands = [],
+  } = data || {};
 
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Carousel */}
-      <section className="container py-8">
-        <div className="relative rounded-2xl overflow-hidden">
-          {heroSlides.map((slide, i) => (
-            <div
-              key={i}
-              className={`transition-opacity duration-700 ${i === currentSlide ? "opacity-100" : "opacity-0 absolute inset-0"}`}
-            >
-              <img src={slide.img} alt={slide.title} className="w-full h-[300px] sm:h-[420px] object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-r from-foreground/70 to-transparent flex items-center">
-                <div className="px-8 sm:px-12 max-w-lg">
-                  <p className="text-primary-foreground/80 text-sm font-medium mb-2 tracking-wider uppercase">{slide.subtitle}</p>
-                  <h2 className="text-3xl sm:text-4xl font-extrabold text-primary-foreground leading-tight mb-4">
-                    {slide.title}
-                  </h2>
-                  <p className="text-primary-foreground/70 text-sm mb-6 leading-relaxed">{slide.desc}</p>
-                  <Link
-                    href="/products"
-                    className="inline-flex items-center gap-2 bg-card text-foreground font-semibold px-6 py-3 rounded-full text-sm hover:opacity-90 transition-opacity"
-                  >
-                    Shop Now <ArrowRight className="w-4 h-4" />
-                  </Link>
-                </div>
-              </div>
-            </div>
-          ))}
-
-          {/* Arrows */}
-          <button onClick={prevSlide} className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-card/80 backdrop-blur flex items-center justify-center hover:bg-card transition-colors z-10">
-            <ChevronLeft className="w-5 h-5 text-foreground" />
-          </button>
-          <button onClick={nextSlide} className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-card/80 backdrop-blur flex items-center justify-center hover:bg-card transition-colors z-10">
-            <ChevronRight className="w-5 h-5 text-foreground" />
-          </button>
-
-          {/* Dots */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-            {heroSlides.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setCurrentSlide(i)}
-                className={`h-2 rounded-full transition-all duration-300 ${i === currentSlide ? "w-6 bg-primary-foreground" : "w-2 bg-primary-foreground/40"}`}
-              />
-            ))}
-          </div>
-        </div>
-      </section>
+      <HeroCarousel slides={banners} />
 
       {/* Perks bar */}
       <section className="container pb-8">
@@ -204,98 +101,90 @@ export default function Index() {
       </section>
 
       {/* Categories */}
-      <section className="container pb-12">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-foreground">Shop by Category</h3>
-          <button className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
-            View All <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-        <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-          {categories.map((cat) => (
-            <Link
-              href={`/category/${cat.slug}`}
-              key={cat.name}
-              className="bg-card rounded-xl shadow-card overflow-hidden group cursor-pointer hover:shadow-card-hover transition-shadow duration-300"
-            >
-              <div className="aspect-[4/3] overflow-hidden">
-                <img src={cat.img} alt={cat.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-              </div>
-              <div className="p-2 text-center">
-                <p className="text-xs font-semibold text-foreground">{cat.name}</p>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* Featured Products */}
-      <section className="container pb-12">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-foreground">Featured Products</h3>
-          <button className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
-            View All <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {featuredProducts.map((p) => (
-            <Link
-              href="/product"
-              key={p.name}
-              className="bg-card rounded-2xl shadow-card overflow-hidden group cursor-pointer hover:shadow-card-hover transition-shadow duration-300"
-            >
-              <div className="aspect-square overflow-hidden">
-                <img src={p.img} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-              </div>
-              <div className="p-4">
-                <p className="text-sm font-semibold text-foreground line-clamp-1">{p.name}</p>
-                <div className="flex items-center gap-1 mt-1.5">
-                  <Star className="w-3.5 h-3.5 fill-star text-star" />
-                  <span className="text-xs text-muted-foreground">{p.rating}</span>
-                </div>
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="text-sm font-bold text-foreground">{p.price}</span>
-                  {p.original && <span className="text-xs text-muted-foreground line-through">{p.original}</span>}
-                  {p.original && (
-                    <span className="text-[10px] font-semibold bg-discount/10 text-discount px-1.5 py-0.5 rounded-md">Sale</span>
-                  )}
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* Deals Banner */}
-      <section className="container pb-12">
-        <div className="bg-primary rounded-2xl p-8 sm:p-10">
+      {categories?.length > 0 && (
+        <section className="container pb-12">
           <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-xl font-bold text-primary-foreground">Today's Best Deals</h3>
-              <p className="text-sm text-primary-foreground/60 mt-1">Don't miss out on these incredible savings</p>
-            </div>
+            <h3 className="text-xl font-bold text-foreground">Shop by Category</h3>
+            <button className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+              View All <ArrowRight className="w-3.5 h-3.5" />
+            </button>
           </div>
-          <div className="grid sm:grid-cols-3 gap-4">
-            {deals.map((d) => (
-              <Link href="/product" key={d.name} className="bg-card rounded-2xl overflow-hidden group hover:shadow-card-hover transition-shadow duration-300">
-                <div className="aspect-square overflow-hidden relative">
-                  <img src={d.img} alt={d.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                  <span className="absolute top-3 left-3 bg-discount text-primary-foreground text-xs font-bold px-2.5 py-1 rounded-full">
-                    -{d.discount}
-                  </span>
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+            {categories.map((cat) => (
+              <Link
+                href={`/category/${cat.slug}`}
+                key={cat.id}
+                className="bg-card rounded-xl shadow-card overflow-hidden group cursor-pointer hover:shadow-card-hover transition-shadow duration-300"
+              >
+                <div className="aspect-[4/3] overflow-hidden">
+                  <img src={cat.imageUrl} alt={cat.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 </div>
-                <div className="p-4">
-                  <p className="text-sm font-semibold text-foreground">{d.name}</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-sm font-bold text-foreground">{d.price}</span>
-                    <span className="text-xs text-muted-foreground line-through">{d.original}</span>
-                  </div>
+                <div className="p-2 text-center">
+                  <p className="text-xs font-semibold text-foreground">{cat.name}</p>
                 </div>
               </Link>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
+      )}
+
+      {/* Featured Products */}
+      {featuredProducts?.length > 0 && (
+        <section className="container pb-12">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-foreground">Featured Products</h3>
+            <button className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+              View All <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {featuredProducts.map((p) => (
+              <ProductCard
+                key={p.id}
+                product={{
+                  id: p.id,
+                  brand: p.brand || "",
+                  name: p.title || "",
+                  price: `$${p.price || 0}`,
+                  rating: p.rating || 0,
+                  reviews: p.ratingCount || 0,
+                  image: p.imageUrl || "",
+                }}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Deals Banner */}
+      {deals?.length > 0 && (
+        <section className="container pb-12">
+          <div className="bg-primary rounded-2xl p-8 sm:p-10">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-xl font-bold text-primary-foreground">Today's Best Deals</h3>
+                <p className="text-sm text-primary-foreground/60 mt-1">Don't miss out on these incredible savings</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {deals.map((p) => (
+                <ProductCard
+                  key={p.id}
+                  product={{
+                    id: p.id,
+                    brand: p.brand || "",
+                    name: p.title || "",
+                    price: `$${p.price || 0}`,
+                    rating: p.rating || 0,
+                    reviews: p.ratingCount || 0,
+                    image: p.imageUrl || "",
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Bento Grid - Explore */}
       <section className="container pb-12">
@@ -358,24 +247,19 @@ export default function Index() {
         </div>
       </section>
 
-      {/* Trending Brands */}
-      <section className="container pb-12">
-        <h3 className="text-xl font-bold text-foreground mb-6">Popular Brands</h3>
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-4">
-          {[
-            { name: "Nike", slug: "nike" },
-            { name: "Adidas", slug: "adidas" },
-            { name: "Sony", slug: "sony" },
-            { name: "Samsung", slug: "samsung" },
-            { name: "IKEA", slug: "ikea" },
-            { name: "Zara", slug: "zara" },
-          ].map((brand) => (
-            <Link href={`/brand/${brand.slug}`} key={brand.slug} className="bg-card rounded-2xl shadow-card p-6 flex items-center justify-center hover:shadow-card-hover transition-shadow duration-300 cursor-pointer">
-              <span className="text-sm font-bold text-muted-foreground tracking-wider">{brand.name}</span>
-            </Link>
-          ))}
-        </div>
-      </section>
+      {/* Popular Brands */}
+      {brands?.length > 0 && (
+        <section className="container pb-12">
+          <h3 className="text-xl font-bold text-foreground mb-6">Popular Brands</h3>
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-4">
+            {brands.map((brand) => (
+              <Link href={`/brand/${brand.name.toLowerCase()}`} key={brand.name} className="bg-card rounded-2xl shadow-card p-6 flex items-center justify-center hover:shadow-card-hover transition-shadow duration-300 cursor-pointer">
+                <span className="text-sm font-bold text-muted-foreground tracking-wider line-clamp-1">{brand.name}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Stats / Social proof */}
       <section className="container pb-12">
@@ -425,31 +309,33 @@ export default function Index() {
         </div>
       </section>
 
-      {/* Trending Stores */}
-      <section className="container pb-12">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-foreground">Trending Stores</h3>
-          <button className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
-            View All <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {trendingStores.map((store) => (
-            <div key={store.name} className="bg-card rounded-2xl shadow-card p-5 text-center hover:shadow-card-hover transition-shadow duration-300 cursor-pointer group">
-              <div className="w-14 h-14 rounded-2xl mx-auto mb-3 flex items-center justify-center text-primary-foreground font-bold text-lg" style={{ backgroundColor: store.color }}>
-                {store.name.charAt(0)}
-              </div>
-              <p className="text-sm font-semibold text-foreground">{store.name}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{store.category}</p>
-              <div className="flex items-center justify-center gap-1 mt-2">
-                <Star className="w-3 h-3 fill-star text-star" />
-                <span className="text-xs font-medium text-foreground">{store.rating}</span>
-              </div>
-              <p className="text-[10px] text-muted-foreground mt-1">{store.products} products</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* Trending Products */}
+      {trending?.length > 0 && (
+        <section className="container pb-12">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-foreground">Trending Products</h3>
+            <button className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+              View All <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {trending.map((p) => (
+              <ProductCard
+                key={p.id}
+                product={{
+                  id: p.id,
+                  brand: p.brand || "",
+                  name: p.title || "",
+                  price: `$${p.price || 0}`,
+                  rating: p.rating || 0,
+                  reviews: p.ratingCount || 0,
+                  image: p.imageUrl || "",
+                }}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Top Rated Products */}
       <section className="container pb-12">

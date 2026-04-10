@@ -267,6 +267,22 @@ export interface ListBuyerProductsResponse {
   };
 }
 
+// --- Search suggestion types ---
+
+export interface ProductSearchSuggestion {
+  id: string;
+  title: string;
+  brand: string | null;
+  price: string;
+  originalPrice: string | null;
+  images: Array<{ url: string; isCover: boolean; sortOrder: number }> | null;
+  category: { id: string; name: string; slug: string } | null;
+}
+
+export interface SearchBuyerProductsResponse {
+  items: ProductSearchSuggestion[];
+}
+
 // --- Category tree ---
 
 export interface CategoryTreeNode extends Category {

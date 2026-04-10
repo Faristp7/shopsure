@@ -1,6 +1,6 @@
-import { Search } from "lucide-react";
 import Image from "next/image";
 import React from "react";
+import { SearchBar } from "./SearchBar";
 
 export const MarketplaceHeader: React.FC = () => {
   return (
@@ -22,13 +22,9 @@ export const MarketplaceHeader: React.FC = () => {
                 alt="search"
                 width={18}
                 height={18}
-                className="absolute left-3 top-1/2 -translate-y-1/2 opacity-60 group-focus-within:opacity-100 cursor-pointer"
-              />{" "}
-              <input
-                className="w-full h-11 bg-slate-100 dark:bg-slate-800 border-none rounded-xl pl-10 pr-4 focus:ring-2 focus:ring-brand-primary/20 transition-all text-sm outline-none"
-                placeholder="Search for products, brands and more..."
-                type="text"
+                className="absolute left-3 top-1/2 -translate-y-1/2 opacity-60 group-focus-within:opacity-100 pointer-events-none z-10"
               />
+              <SearchBar />
             </div>
           </div>
 
@@ -113,12 +109,11 @@ export const MarketplaceHeader: React.FC = () => {
               alt="search"
               width={18}
               height={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 opacity-60 group-focus-within:opacity-100 cursor-pointer"
+              className="absolute left-3 top-1/2 -translate-y-1/2 opacity-60 pointer-events-none z-10"
             />
-            <input
-              className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl py-2.5 pl-10 pr-4 text-sm focus:ring-2 focus:ring-brand-primary/50 transition-all outline-none"
+            <SearchBar
+              inputClassName="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl py-2.5 pl-10 pr-4 text-sm focus:ring-2 focus:ring-brand-primary/50 transition-all outline-none"
               placeholder="Search for electronics, fashion, beauty..."
-              type="text"
             />
           </div>
         </div>

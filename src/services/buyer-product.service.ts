@@ -4,6 +4,7 @@ import type {
   BuyerProductDetail,
   ListBuyerProductsQuery,
   ListBuyerProductsResponse,
+  SearchBuyerProductsResponse,
 } from '@/types/product';
 
 export const buyerProductService = {
@@ -25,5 +26,10 @@ export const buyerProductService = {
 
   getProductById: async (id: string): Promise<BuyerProductDetail> => {
     return apiService.get<BuyerProductDetail>(`/v1/buyer/products/${id}`);
+  },
+
+  searchSuggestions: async (q: string, limit = 8): Promise<SearchBuyerProductsResponse> => {
+    const params = new URLSearchParams({ q, limit: limit.toString() });
+    return apiService.get<SearchBuyerProductsResponse>(`/v1/buyer/products/search?${params}`);
   },
 };

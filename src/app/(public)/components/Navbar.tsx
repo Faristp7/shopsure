@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ShoppingBag, Search, MapPin, ChevronDown, User, LogIn, UserPlus, Package, Heart, Settings, LogOut, Navigation } from "lucide-react";
+import { SearchBar } from "@/components/public/SearchBar";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -56,11 +57,10 @@ const Navbar = () => {
           </Link>
 
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none z-10" />
+            <SearchBar
+              inputClassName="w-full bg-secondary text-sm rounded-xl py-2.5 pl-9 pr-3 outline-none focus:ring-2 focus:ring-ring/20 transition-all placeholder:text-muted-foreground"
               placeholder="Search products, brands..."
-              className="w-full bg-secondary text-sm rounded-xl py-2.5 pl-9 pr-3 outline-none focus:ring-2 focus:ring-ring/20 transition-all placeholder:text-muted-foreground"
             />
           </div>
 

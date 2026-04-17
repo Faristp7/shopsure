@@ -1,155 +1,44 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { useRouter, useParams } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, use } from "react";
+import { useRouter } from "next/navigation";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { ordersService } from "@/services/orders.service";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   Copy,
   Phone,
   Mail,
   MapPin,
-  Download,
-  Printer,
-  Truck,
-  ExternalLink,
-  Plus,
   CheckCircle2,
   XCircle,
   Clock,
   Package,
   ShoppingBag,
-  MessageSquare,
-  RotateCcw,
-  StickyNote,
+  Truck,
   ChevronDown,
-  ChevronUp,
   AlertTriangle,
   IndianRupee,
+  AlertCircle,
 } from "lucide-react";
 
-// --- Mock Data ---
-const mockOrder = {
-  id: "#ORD-1234",
-  date: "15 Feb 2026, 10:32 AM",
-  status: "New" as OrderStatus,
-  paymentStatus: "Paid" as "Paid" | "Pending" | "Refunded",
-  total: 2499,
-  commission: 250,
-  netPayout: 2249,
-  expectedPayout: "22 Feb 2026",
-  customer: {
-    name: "Sneha Mehta",
-    phone: "+91 98765 43210",
-    email: "sneha.mehta@email.com",
-    address:
-      "Flat 302, Sunrise Apartments, MG Road, Koramangala, Bangalore – 560034",
-    landmark: "Near Forum Mall",
-  },
-  items: [
-    {
-      id: 1,
-      name: "Blue Anarkali Set",
-      variant: "Size M / Royal Blue",
-      sku: "ANK-BLU-M",
-      qty: 1,
-      price: 1999,
-      image: "👗",
-    },
-    {
-      id: 2,
-      name: "Matching Dupatta",
-      variant: "Free Size / Blue",
-      sku: "DUP-BLU-F",
-      qty: 1,
-      price: 500,
-      image: "🧣",
-    },
-  ],
-  shipping: 0,
-  tax: 0,
-  timeline: [
-    {
-      stage: "Placed",
-      date: "15 Feb 2026, 10:32 AM",
-      by: "System",
-      done: true,
-    },
-    { stage: "Accepted", date: "", by: "", done: false },
-    { stage: "Packed", date: "", by: "", done: false },
-    { stage: "Shipped", date: "", by: "", done: false },
-    { stage: "Delivered", date: "", by: "", done: false },
-  ],
-  courier: null as string | null,
-  trackingId: null as string | null,
-  estimatedDelivery: null as string | null,
-  notes: [
-    { text: "Customer requested gift wrapping", time: "15 Feb, 10:45 AM" },
-  ],
-  returnRequested: false,
-  returnReason: null as string | null,
-  returnStatus: null as string | null,
-  messages: [
-    {
-      from: "Buyer",
-      text: "Hi, can you add gift wrapping?",
-      time: "15 Feb, 10:40 AM",
-    },
-    {
-      from: "Seller",
-      text: "Sure! I'll add a handwritten note too.",
-      time: "15 Feb, 10:45 AM",
-    },
-  ],
-  cancellation: null as { reason: string; by: string } | null,
-};
+type OrderStatus = "CREATED" | "PENDING_PAYMENT" | "PAID" | "CONFIRMED" | "SHIPPED" | "DELIVERED" | "CANCELLED" | "RETURNED";
 
-type OrderStatus = "New" | "Packed" | "Shipped" | "Delivered" | "Cancelled";
-
-const statusConfig: Record<
-  OrderStatus,
-  { color: string; icon: React.ReactNode }
-> = {
-  New: {
-    color: "bg-primary/10 text-primary border-primary/20",
-    icon: <ShoppingBag className="h-3.5 w-3.5" />,
-  },
-  Packed: {
-    color: "bg-warning/10 text-warning border-warning/20",
-    icon: <Package className="h-3.5 w-3.5" />,
-  },
-  Shipped: {
-    color: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-    icon: <Truck className="h-3.5 w-3.5" />,
-  },
-  Delivered: {
-    color: "bg-success/10 text-success border-success/20",
-    icon: <CheckCircle2 className="h-3.5 w-3.5" />,
-  },
-  Cancelled: {
-    color: "bg-destructive/10 text-destructive border-destructive/20",
-    icon: <XCircle className="h-3.5 w-3.5" />,
-  },
-};
-
-const paymentColors: Record<string, string> = {
-  Paid: "bg-success/10 text-success border-success/20",
-  Pending: "bg-warning/10 text-warning border-warning/20",
-  Refunded: "bg-muted text-muted-foreground border-border",
+const statusConfig: Record<string, { color: string; label: string; icon: React.ReactNode }> = {
+  CREATED: { color: "bg-secondary text-muted-foreground border-border", label: "New", icon: <ShoppingBag className="h-3.5 w-3.5" /> },
+  PENDING_PAYMENT: { color: "bg-warning/10 text-warning border-warning/20", label: "Awaiting Payment", icon: <Clock className="h-3.5 w-3.5" /> },
+  PAID: { color: "bg-success/10 text-success border-success/20", label: "Paid", icon: <CheckCircle2 className="h-3.5 w-3.5" /> },
+  CONFIRMED: { color: "bg-primary/10 text-primary border-primary/20", label: "Confirmed", icon: <Package className="h-3.5 w-3.5" /> },
+  SHIPPED: { color: "bg-blue-500/10 text-blue-600 border-blue-500/20", label: "Shipped", icon: <Truck className="h-3.5 w-3.5" /> },
+  DELIVERED: { color: "bg-success/10 text-success border-success/20", label: "Delivered", icon: <CheckCircle2 className="h-3.5 w-3.5" /> },
+  CANCELLED: { color: "bg-destructive/10 text-destructive border-destructive/20", label: "Cancelled", icon: <XCircle className="h-3.5 w-3.5" /> },
+  RETURNED: { color: "bg-destructive/10 text-destructive border-destructive/20", label: "Returned", icon: <XCircle className="h-3.5 w-3.5" /> },
 };
 
 // --- Collapsible Section Wrapper ---
@@ -192,113 +81,83 @@ const Section = ({
   );
 };
 
-export default function OrderDetailPage() {
-  const params = useParams();
+export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const router = useRouter();
+  const queryClient = useQueryClient();
   const isMobile = useIsMobile();
-  const [order, setOrder] = useState(mockOrder);
-  const [newNote, setNewNote] = useState("");
-  const [newMessage, setNewMessage] = useState("");
-  const [courierInput, setCourierInput] = useState("");
-  const [trackingInput, setTrackingInput] = useState("");
   const [copied, setCopied] = useState(false);
 
-  const copyAddress = () => {
-    navigator.clipboard.writeText(order.customer.address);
+  const { data: order, isLoading, isError } = useQuery({
+    queryKey: ["seller-order", id],
+    queryFn: () => ordersService.getSellerOrder(id),
+  });
+
+  const shipMutation = useMutation({
+    mutationFn: () => ordersService.shipOrder(id),
+    onSuccess: () => {
+      toast.success("Order marked as shipped");
+      queryClient.invalidateQueries({ queryKey: ["seller-order", id] });
+      queryClient.invalidateQueries({ queryKey: ["seller-orders"] });
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.message ?? "Failed"),
+  });
+
+  const deliverMutation = useMutation({
+    mutationFn: () => ordersService.deliverOrder(id),
+    onSuccess: () => {
+      toast.success("Order marked as delivered");
+      queryClient.invalidateQueries({ queryKey: ["seller-order", id] });
+      queryClient.invalidateQueries({ queryKey: ["seller-orders"] });
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.message ?? "Failed"),
+  });
+
+  const copyAddress = (addr: string) => {
+    navigator.clipboard.writeText(addr);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const addNote = () => {
-    if (!newNote.trim()) return;
-    setOrder((prev) => ({
-      ...prev,
-      notes: [...prev.notes, { text: newNote, time: "Just now" }],
-    }));
-    setNewNote("");
-  };
+  if (isLoading) {
+    return (
+      <div className="space-y-4 max-w-5xl mx-auto">
+        <div className="h-8 w-32 bg-muted rounded animate-pulse" />
+        {[1, 2, 3].map((i) => <div key={i} className="bg-card rounded-xl p-6 h-32 animate-pulse border border-border" />)}
+      </div>
+    );
+  }
 
-  const sendMessage = () => {
-    if (!newMessage.trim()) return;
-    setOrder((prev) => ({
-      ...prev,
-      messages: [
-        ...prev.messages,
-        { from: "Seller", text: newMessage, time: "Just now" },
-      ],
-    }));
-    setNewMessage("");
-  };
+  if (isError || !order) {
+    return (
+      <div className="text-center py-16">
+        <AlertCircle className="w-12 h-12 mx-auto text-destructive/50 mb-4" />
+        <p className="text-muted-foreground mb-4">Order not found.</p>
+        <Button variant="outline" onClick={() => router.push("/seller/orders")}>Back to Orders</Button>
+      </div>
+    );
+  }
 
-  const advanceStatus = (newStatus: OrderStatus) => {
-    setOrder((prev) => {
-      const stages = ["Placed", "Accepted", "Packed", "Shipped", "Delivered"];
-      const targetIdx = stages.indexOf(
-        newStatus === "Packed"
-          ? "Packed"
-          : newStatus === "Shipped"
-            ? "Shipped"
-            : newStatus === "Delivered"
-              ? "Delivered"
-              : "Accepted",
-      );
-      const updatedTimeline = prev.timeline.map((t, i) =>
-        i <= targetIdx
-          ? {
-              ...t,
-              done: true,
-              date: t.date || "Just now",
-              by: t.by || "Seller",
-            }
-          : t,
-      );
-      return { ...prev, status: newStatus, timeline: updatedTimeline };
-    });
-  };
+  const cfg = statusConfig[order.status] ?? statusConfig.CREATED;
+  const shippingAddr = order.shippingAddress as any;
+  const totalAmount = parseFloat(order.totalAmount);
+  const commission = parseFloat(order.commissionAmount);
+  const netPayout = parseFloat(order.sellerPayableAmount);
 
-  const subtotal = order.items.reduce(
-    (sum, item) => sum + item.price * item.qty,
-    0,
-  );
-  const grandTotal = subtotal + order.shipping + order.tax;
+  const actions: { label: string; onClick: () => void; variant?: "default" | "destructive" | "outline"; loading?: boolean }[] = [];
+  if (order.status === "CONFIRMED") {
+    actions.push({ label: "Mark as Shipped", onClick: () => shipMutation.mutate(), variant: "default", loading: shipMutation.isPending });
+  }
+  if (order.status === "SHIPPED") {
+    actions.push({ label: "Mark as Delivered", onClick: () => deliverMutation.mutate(), variant: "default", loading: deliverMutation.isPending });
+  }
 
-  const actions: {
-    label: string;
-    onClick: () => void;
-    variant?: "default" | "destructive" | "outline";
-  }[] = [];
-  if (order.status === "New")
-    actions.push({
-      label: "Accept Order",
-      onClick: () => advanceStatus("Packed"),
-      variant: "default",
-    });
-  if (order.status === "New" || order.status === "Packed")
-    actions.push({
-      label: "Mark as Packed",
-      onClick: () => advanceStatus("Packed"),
-    });
-  if (order.status === "Packed")
-    actions.push({
-      label: "Mark as Shipped",
-      onClick: () => advanceStatus("Shipped"),
-      variant: "default",
-    });
-  if (order.status === "New" || order.status === "Packed")
-    actions.push({
-      label: "Cancel Order",
-      onClick: () =>
-        setOrder((prev) => ({
-          ...prev,
-          status: "Cancelled",
-          cancellation: { reason: "Seller cancelled", by: "Seller" },
-        })),
-      variant: "destructive",
-    });
-
-  const uniqueActions = actions.filter(
-    (a, i, arr) => arr.findIndex((b) => b.label === a.label) === i,
-  );
+  const timeline = [
+    { stage: "Order Placed", done: true, date: order.createdAt },
+    { stage: "Confirmed", done: ["CONFIRMED", "SHIPPED", "DELIVERED"].includes(order.status) },
+    { stage: "Shipped", done: ["SHIPPED", "DELIVERED"].includes(order.status) },
+    { stage: "Delivered", done: order.status === "DELIVERED" },
+  ];
 
   return (
     <div className="space-y-4 pb-28 sm:pb-6 animate-fade-in max-w-5xl mx-auto">

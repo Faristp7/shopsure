@@ -2,39 +2,87 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CreditCard, Truck, Shield } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, CreditCard, Truck, Shield, CheckCircle2 } from "lucide-react";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
+import { ordersService } from "@/services/orders.service";
+import { toast } from "sonner";
 
 const CheckoutPage = () => {
-  const { items, total } = useCart();
+  const router = useRouter();
+  const { items, total, clearCart } = useCart();
   const { addresses } = useAuth();
 
   const subtotal = total;
-  const shipping = subtotal > 50 ? 0 : 5.99;
-  const tax = +(subtotal * 0.08).toFixed(2);
+  const shipping = subtotal >= 999 ? 0 : 99;
+  const tax = +(subtotal * 0.18).toFixed(2);
   const grandTotal = +(subtotal + shipping + tax).toFixed(2);
 
-  const defaultAddress = addresses.find((a) => a.isDefault) || addresses[0];
+  const defaultAddress = addresses.find((a) => a.isDefault) ?? addresses[0] ?? null;
 
-  const [selectedPayment, setSelectedPayment] = useState("card");
-  const [orderPlaced, setOrderPlaced] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState<"COD" | "PREPAID">("COD");
+  const [isPlacing, setIsPlacing] = useState(false);
+  const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
 
-  if (orderPlaced) {
+  const handlePlaceOrder = async () => {
+    if (!defaultAddress) {
+      toast.error("Please add a delivery address before placing your order.");
+      return;
+    }
+    if (items.length === 0) {
+      toast.error("Your cart is empty.");
+      return;
+    }
+
+    setIsPlacing(true);
+    try {
+      const order = await ordersService.createOrder({
+        shippingName: defaultAddress.name,
+        shippingPhone: defaultAddress.phone,
+        shippingStreet: defaultAddress.street,
+        shippingCity: defaultAddress.city,
+        shippingState: defaultAddress.state,
+        shippingZip: defaultAddress.zip,
+        paymentMethod: selectedPayment,
+      });
+      await clearCart();
+      setPlacedOrderId(order.id);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? "Failed to place order. Please try again.";
+      toast.error(msg);
+    } finally {
+      setIsPlacing(false);
+    }
+  };
+
+  if (placedOrderId) {
     return (
       <main className="container py-20 text-center">
-        <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-          <Shield className="w-8 h-8 text-primary" />
+        <div className="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-6">
+          <CheckCircle2 className="w-8 h-8 text-success" />
         </div>
         <h1 className="text-2xl font-bold text-foreground mb-2">Order Placed Successfully!</h1>
-        <p className="text-muted-foreground mb-1">Order #ORD-{Math.random().toString(36).slice(2, 8).toUpperCase()}</p>
-        <p className="text-sm text-muted-foreground mb-8">You will receive a confirmation email shortly.</p>
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 bg-primary text-primary-foreground font-semibold px-6 py-3 rounded-full text-sm hover:opacity-90 transition-opacity"
-        >
-          Continue Shopping
-        </Link>
+        <p className="text-muted-foreground mb-1">Order #{placedOrderId.slice(-8).toUpperCase()}</p>
+        <p className="text-sm text-muted-foreground mb-8">
+          {selectedPayment === "COD"
+            ? "Your order has been confirmed. Pay on delivery."
+            : "Please complete payment to confirm your order."}
+        </p>
+        <div className="flex gap-3 justify-center">
+          <Link
+            href={`/orders/${placedOrderId}`}
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground font-semibold px-6 py-3 rounded-full text-sm hover:opacity-90 transition-opacity"
+          >
+            View Order
+          </Link>
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 border border-border font-semibold px-6 py-3 rounded-full text-sm hover:bg-secondary transition-colors"
+          >
+            Continue Shopping
+          </Link>
+        </div>
       </main>
     );
   }
@@ -80,9 +128,7 @@ const CheckoutPage = () => {
             </h2>
             <div className="flex flex-col gap-3">
               {[
-                { id: "card", label: "Credit / Debit Card" },
-                { id: "upi", label: "UPI" },
-                { id: "cod", label: "Cash on Delivery" },
+                { id: "COD" as const, label: "Cash on Delivery" },
               ].map((m) => (
                 <label
                   key={m.id}
@@ -102,17 +148,6 @@ const CheckoutPage = () => {
                 </label>
               ))}
             </div>
-
-            {selectedPayment === "card" && (
-              <div className="mt-4 flex flex-col gap-3">
-                <input placeholder="Card Number" className="bg-secondary/30 border border-border rounded-xl py-2.5 px-4 text-sm outline-none focus:ring-2 focus:ring-ring/20 placeholder:text-muted-foreground" />
-                <div className="grid grid-cols-2 gap-3">
-                  <input placeholder="MM/YY" className="bg-secondary/30 border border-border rounded-xl py-2.5 px-4 text-sm outline-none focus:ring-2 focus:ring-ring/20 placeholder:text-muted-foreground" />
-                  <input placeholder="CVV" className="bg-secondary/30 border border-border rounded-xl py-2.5 px-4 text-sm outline-none focus:ring-2 focus:ring-ring/20 placeholder:text-muted-foreground" />
-                </div>
-                <input placeholder="Name on Card" className="bg-secondary/30 border border-border rounded-xl py-2.5 px-4 text-sm outline-none focus:ring-2 focus:ring-ring/20 placeholder:text-muted-foreground" />
-              </div>
-            )}
           </section>
         </div>
 
@@ -132,7 +167,7 @@ const CheckoutPage = () => {
                     {item.variant && <p className="text-xs text-muted-foreground">{item.variant}</p>}
                     <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
                   </div>
-                  <p className="text-sm font-semibold text-foreground">${(item.price * item.quantity).toFixed(2)}</p>
+                  <p className="text-sm font-semibold text-foreground">₹{(item.price * item.quantity).toLocaleString("en-IN")}</p>
                 </div>
               ))}
             </div>
@@ -140,28 +175,29 @@ const CheckoutPage = () => {
             <div className="border-t border-border pt-4 flex flex-col gap-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-medium text-foreground">${subtotal.toFixed(2)}</span>
+                <span className="font-medium text-foreground">₹{subtotal.toLocaleString("en-IN")}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Shipping</span>
-                <span className="font-medium text-foreground">{shipping === 0 ? "Free" : `$${shipping.toFixed(2)}`}</span>
+                <span className="font-medium text-foreground">{shipping === 0 ? "Free" : `₹${shipping}`}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Tax</span>
-                <span className="font-medium text-foreground">${tax.toFixed(2)}</span>
+                <span className="text-muted-foreground">Tax (GST 18%)</span>
+                <span className="font-medium text-foreground">₹{tax.toLocaleString("en-IN")}</span>
               </div>
             </div>
 
             <div className="border-t border-border mt-4 pt-4 flex justify-between">
               <span className="text-base font-bold text-foreground">Total</span>
-              <span className="text-base font-bold text-foreground">${grandTotal.toFixed(2)}</span>
+              <span className="text-base font-bold text-foreground">₹{grandTotal.toLocaleString("en-IN")}</span>
             </div>
 
             <button
-              onClick={() => setOrderPlaced(true)}
-              className="w-full bg-primary text-primary-foreground font-semibold py-3.5 rounded-full text-sm mt-6 hover:opacity-90 transition-opacity active:scale-[0.98] uppercase tracking-wider shadow-lg shadow-primary/20"
+              onClick={handlePlaceOrder}
+              disabled={isPlacing || items.length === 0}
+              className="w-full bg-primary text-primary-foreground font-semibold py-3.5 rounded-full text-sm mt-6 hover:opacity-90 transition-opacity active:scale-[0.98] uppercase tracking-wider shadow-lg shadow-primary/20 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Place Order
+              {isPlacing ? "Placing Order…" : "Place Order"}
             </button>
 
             <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground mt-4">

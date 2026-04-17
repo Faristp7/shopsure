@@ -2,15 +2,21 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
-import { ArrowLeft, Heart, Star, Package, Truck, CalendarCheck, Percent, ShoppingBag, Check, Loader2, BellRing } from "lucide-react";
+import { ArrowLeft, Heart, Star, Package, Truck, CalendarCheck, Percent, ShoppingBag, Check, Loader2, BellRing, ThumbsUp, Send } from "lucide-react";
 import { useCart } from "../../context/CartContext";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { BuyerProductDetail, BuyerProduct } from "@/types/product";
+import { reviewsService, type Review } from "@/services/reviews.service";
 
 // ─── Gallery ────────────────────────────────────────────────────────────────
 
@@ -338,33 +344,168 @@ function ProductInfo({ product }: { product: BuyerProductDetail }) {
 
 // ─── Rating & Reviews ────────────────────────────────────────────────────────
 
-function RatingReviews({ product }: { product: BuyerProductDetail }) {
-  const avg = product.averageRating ? parseFloat(product.averageRating) : 0;
-
+function StarRating({ value, onChange, size = "md" }: { value: number; onChange?: (v: number) => void; size?: "sm" | "md" }) {
+  const [hovered, setHovered] = useState(0);
+  const sz = size === "sm" ? "w-4 h-4" : "w-6 h-6";
   return (
-    <div className="bg-card rounded-2xl shadow-card p-6">
-      <h3 className="text-lg font-bold text-foreground mb-6">
-        Rating & Reviews
-      </h3>
-      <div className="flex items-baseline gap-1">
-        <span className="text-5xl font-extrabold text-foreground">
-          {avg > 0 ? avg.toFixed(1) : "—"}
-        </span>
-        <span className="text-lg text-muted-foreground">/ 5</span>
-      </div>
-      <div className="flex items-center gap-1.5 mt-2">
-        {Array.from({ length: 5 }).map((_, i) => (
+    <div className="flex gap-0.5">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <button
+          key={i}
+          type="button"
+          onClick={() => onChange?.(i + 1)}
+          onMouseEnter={() => onChange && setHovered(i + 1)}
+          onMouseLeave={() => onChange && setHovered(0)}
+          className={onChange ? "cursor-pointer" : "cursor-default"}
+        >
           <Star
-            key={i}
-            className={`w-5 h-5 ${
-              i < Math.round(avg) ? "fill-star text-star" : "text-muted"
+            className={`${sz} transition-colors ${
+              i < (hovered || value) ? "fill-star text-star" : "text-muted-foreground/30"
             }`}
           />
-        ))}
-        <span className="text-sm text-muted-foreground ml-1">
-          ({product.ratingCount} reviews)
-        </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function RatingReviews({ product }: { product: BuyerProductDetail }) {
+  const queryClient = useQueryClient();
+  const avg = product.averageRating ? parseFloat(product.averageRating) : 0;
+  const [showForm, setShowForm] = useState(false);
+  const [rating, setRating] = useState(5);
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["product-reviews", product.id],
+    queryFn: () => reviewsService.getProductReviews(product.id),
+    staleTime: 60_000,
+  });
+
+  const markHelpfulMutation = useMutation({
+    mutationFn: reviewsService.markHelpful,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["product-reviews", product.id] }),
+  });
+
+  const submitMutation = useMutation({
+    mutationFn: reviewsService.createReview,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["product-reviews", product.id] });
+      setShowForm(false);
+      setTitle("");
+      setBody("");
+      setRating(5);
+    },
+  });
+
+  const reviews = data?.items ?? [];
+  const summary = data;
+
+  return (
+    <div className="bg-card rounded-2xl shadow-card p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-bold text-foreground">Rating & Reviews</h3>
+        <Button size="sm" variant="outline" onClick={() => setShowForm(!showForm)}>
+          {showForm ? "Cancel" : "Write a Review"}
+        </Button>
       </div>
+
+      {/* Summary */}
+      <div className="flex items-start gap-6">
+        <div className="text-center">
+          <p className="text-5xl font-extrabold text-foreground">{avg > 0 ? avg.toFixed(1) : "—"}</p>
+          <StarRating value={Math.round(avg)} size="sm" />
+          <p className="text-xs text-muted-foreground mt-1">{product.ratingCount ?? reviews.length} reviews</p>
+        </div>
+        {summary && (
+          <div className="flex-1 space-y-1.5">
+            {([5, 4, 3, 2, 1] as const).map((star) => {
+              const count = summary.distribution?.[star] ?? 0;
+              const pct = summary.totalCount > 0 ? Math.round((count / summary.totalCount) * 100) : 0;
+              return (
+                <div key={star} className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="w-4 text-right">{star}</span>
+                  <Star className="w-3 h-3 fill-star text-star" />
+                  <div className="flex-1 bg-muted rounded-full h-1.5 overflow-hidden">
+                    <div className="h-full bg-star rounded-full transition-all" style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="w-7 text-right">{pct}%</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Write Review Form */}
+      {showForm && (
+        <div className="bg-muted/30 rounded-xl p-4 space-y-4 border border-border/60">
+          <h4 className="font-semibold text-sm">Your Review</h4>
+          <div>
+            <Label className="text-xs mb-1.5 block">Rating</Label>
+            <StarRating value={rating} onChange={setRating} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Title</Label>
+            <Input placeholder="Summarise your experience" value={title} onChange={(e) => setTitle(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Review</Label>
+            <Textarea placeholder="Tell others about this product..." rows={3} value={body} onChange={(e) => setBody(e.target.value)} />
+          </div>
+          <Button
+            size="sm"
+            className="gap-2"
+            disabled={!rating || !body.trim() || submitMutation.isPending}
+            onClick={() => submitMutation.mutate({ productId: product.id, orderId: "", rating, title, body })}
+          >
+            {submitMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+            Submit Review
+          </Button>
+        </div>
+      )}
+
+      {/* Reviews List */}
+      {isLoading ? (
+        <div className="flex justify-center py-6">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : reviews.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-4">No reviews yet. Be the first to review!</p>
+      ) : (
+        <div className="space-y-5 divide-y divide-border/40">
+          {reviews.map((review: Review) => (
+            <div key={review.id} className="pt-5 first:pt-0">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <StarRating value={review.rating} size="sm" />
+                    {review.verifiedPurchase && (
+                      <span className="text-[10px] font-bold text-success bg-success/10 px-2 py-0.5 rounded-full">Verified Purchase</span>
+                    )}
+                  </div>
+                  <p className="font-semibold text-sm mt-1.5">{review.title}</p>
+                </div>
+                <p className="text-xs text-muted-foreground shrink-0">
+                  {new Date(review.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                </p>
+              </div>
+              <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{review.body}</p>
+              <div className="flex items-center justify-between mt-3">
+                <p className="text-xs text-muted-foreground font-medium">{review.userName}</p>
+                <button
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => markHelpfulMutation.mutate(review.id)}
+                >
+                  <ThumbsUp className="w-3.5 h-3.5" />
+                  Helpful ({review.helpfulCount})
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

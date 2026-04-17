@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { analyticsService } from "@/services/analytics.service";
 import { Button } from "@/components/ui/button";
 import {
   BarChart3,
@@ -92,7 +95,22 @@ const deviceData = [
   { name: "Tablet", value: 5, color: "hsl(var(--primary)/.3)" },
 ];
 
+const PERIOD_DAYS: Record<string, number> = { "7D": 7, "30D": 30, "90D": 90, "12M": 365 };
+
 export default function AnalyticsPage() {
+  const [activePeriod, setActivePeriod] = useState("30D");
+
+  const { data: analytics, isLoading } = useQuery({
+    queryKey: ["seller-analytics", activePeriod],
+    queryFn: () => analyticsService.getSellerAnalytics(PERIOD_DAYS[activePeriod]),
+    staleTime: 60_000,
+  });
+
+  const summary = analytics?.summary;
+  const revenueChart = analytics?.revenueChart ?? revenueData;
+  const topProductsList = analytics?.topProducts ?? topProducts;
+  const deviceStats = analytics?.deviceStats?.map((d) => ({ name: d.device, value: d.percentage, color: "hsl(var(--primary))" })) ?? deviceData;
+
   return (
     <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
@@ -103,11 +121,12 @@ export default function AnalyticsPage() {
           </p>
         </div>
         <div className="flex gap-1.5 p-1 bg-muted/40 rounded-xl border border-border/40">
-          {["7D", "30D", "90D", "12M"].map((period, i) => (
+          {["7D", "30D", "90D", "12M"].map((period) => (
             <button
               key={period}
+              onClick={() => setActivePeriod(period)}
               className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all uppercase tracking-tighter ${
-                i === 1
+                activePeriod === period
                   ? "bg-background text-primary shadow-sm border border-border/60"
                   : "text-muted-foreground hover:text-foreground"
               }`}
@@ -123,34 +142,34 @@ export default function AnalyticsPage() {
         {[
           {
             label: "Product Views",
-            value: "12,480",
+            value: summary ? summary.totalViews.toLocaleString("en-IN") : "—",
             icon: Eye,
-            change: "+22.4%",
-            up: true,
+            change: summary ? `${summary.viewsChange >= 0 ? "+" : ""}${summary.viewsChange.toFixed(1)}%` : "—",
+            up: (summary?.viewsChange ?? 0) >= 0,
             tooltip: "Total unique storefront views",
           },
           {
             label: "Total Orders",
-            value: "156",
+            value: summary ? summary.totalOrders.toLocaleString("en-IN") : "—",
             icon: ShoppingCart,
-            change: "+12.1%",
-            up: true,
+            change: summary ? `${summary.ordersChange >= 0 ? "+" : ""}${summary.ordersChange.toFixed(1)}%` : "—",
+            up: (summary?.ordersChange ?? 0) >= 0,
             tooltip: "Delivered & Processing orders",
           },
           {
             label: "Conversion Rate",
-            value: "4.2%",
+            value: summary ? `${summary.conversionRate.toFixed(1)}%` : "—",
             icon: TrendingUp,
-            change: "+0.5%",
-            up: true,
+            change: summary ? `${summary.conversionChange >= 0 ? "+" : ""}${summary.conversionChange.toFixed(1)}%` : "—",
+            up: (summary?.conversionChange ?? 0) >= 0,
             tooltip: "Orders / Total Views",
           },
           {
             label: "Gross Revenue",
-            value: "₹2,45,800",
+            value: summary ? `₹${summary.totalRevenue.toLocaleString("en-IN")}` : "—",
             icon: IndianRupee,
-            change: "-2.3%",
-            up: false,
+            change: summary ? `${summary.revenueChange >= 0 ? "+" : ""}${summary.revenueChange.toFixed(1)}%` : "—",
+            up: (summary?.revenueChange ?? 0) >= 0,
             tooltip: "Revenue before commissions",
           },
         ].map((stat, i) => (
@@ -208,7 +227,7 @@ export default function AnalyticsPage() {
           <CardContent>
             <div className="h-[300px] w-full mt-4">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={revenueData}>
+                <AreaChart data={revenueChart}>
                   <defs>
                     <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
                       <stop
@@ -280,7 +299,7 @@ export default function AnalyticsPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={deviceData}
+                    data={deviceStats}
                     cx="50%"
                     cy="50%"
                     innerRadius={60}
@@ -288,7 +307,7 @@ export default function AnalyticsPage() {
                     paddingAngle={5}
                     dataKey="value"
                   >
-                    {deviceData.map((entry, index) => (
+                    {deviceStats.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -303,7 +322,7 @@ export default function AnalyticsPage() {
               </div>
             </div>
             <div className="w-full space-y-3 mt-6">
-              {deviceData.map((d, i) => (
+              {deviceStats.map((d, i) => (
                 <div
                   key={i}
                   className="flex items-center justify-between text-xs font-bold"
@@ -366,7 +385,7 @@ export default function AnalyticsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">
-                  {topProducts.map((p, i) => (
+                  {topProductsList.map((p, i) => (
                     <tr
                       key={i}
                       className="hover:bg-muted/20 transition-colors group"
@@ -381,7 +400,7 @@ export default function AnalyticsPage() {
                         {p.orders}
                       </td>
                       <td className="px-5 py-4 text-right font-black text-primary text-[11px] uppercase">
-                        {p.conversion}
+                        {(p as any).conversion ?? (p as any).conversionRate}
                       </td>
                       <td className="px-5 py-4 text-right font-black text-foreground tabular-nums tracking-tighter">
                         {p.revenue}

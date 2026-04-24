@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ShoppingBag, Search, MapPin, ChevronDown, User, LogIn, UserPlus, Package, Heart, Settings, LogOut, Navigation } from "lucide-react";
 import { SearchBar } from "@/components/public/SearchBar";
+import { ChatBot } from "@/components/public/ChatBot";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -122,6 +123,8 @@ const Navbar = () => {
               )}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <ChatBot />
 
           <Link href="/cart" className="relative p-2 rounded-lg hover:bg-secondary transition-colors shrink-0" aria-label="Cart">
             <ShoppingBag className="w-5 h-5 text-foreground" />

@@ -62,14 +62,6 @@ function saveAddresses(addresses: Address[]) {
   } catch {}
 }
 
-function setCookie(name: string, value: string, maxAge: number) {
-  document.cookie = `${name}=${value}; path=/; max-age=${maxAge}; SameSite=Strict`;
-}
-
-function clearCookie(name: string) {
-  document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;`;
-}
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -79,6 +71,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [showSignup, setShowSignup] = useState(false);
 
   useEffect(() => {
+    // Restore session from the readable accessToken cookie + localStorage user profile.
+    // The httpOnly refreshToken cookie is invisible to JS — it's used automatically by the browser.
     const hasToken = document.cookie.includes("accessToken=");
     const storedUser = localStorage.getItem("auth_user");
     if (hasToken && storedUser) {
@@ -95,12 +89,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const response = await apiService.post<{
         user: { id: string; fullName: string; email: string; phone: string | null };
         accessToken: string;
-        refreshToken: string;
       }>("v1/auth/login", { email, password });
 
-      setCookie("accessToken", response.accessToken, 86400);
-      setCookie("refreshToken", response.refreshToken, 604800);
-
+      // Backend sets accessToken (readable) and refreshToken (httpOnly) cookies.
+      // We only persist the user profile — no token stored in localStorage.
       const userProfile: UserProfile = {
         id: response.user.id,
         name: response.user.fullName ?? "",
@@ -115,8 +107,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setAddresses(loadAddresses());
       setShowLogin(false);
       return true;
-    } catch (err: any) {
-      const msg = err?.response?.data?.message ?? "Login failed. Please check your credentials.";
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        "Login failed. Please check your credentials.";
       toast.error(msg);
       return false;
     }
@@ -127,8 +121,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await apiService.post("v1/auth/register/buyer", { fullName: name, email, password });
       setShowSignup(false);
       return login(email, password);
-    } catch (err: any) {
-      const msg = err?.response?.data?.message ?? "Registration failed. Please try again.";
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        "Registration failed. Please try again.";
       toast.error(msg);
       return false;
     }
@@ -138,8 +134,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await apiService.post("v1/auth/logout");
     } catch {}
-    clearCookie("accessToken");
-    clearCookie("refreshToken");
+    // Backend clears both cookies (accessToken + httpOnly refreshToken).
+    // Clear local state and user profile.
     localStorage.removeItem("auth_user");
     setUser(null);
     setIsLoggedIn(false);

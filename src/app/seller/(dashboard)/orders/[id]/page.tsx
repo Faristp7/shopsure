@@ -8,6 +8,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import {
@@ -26,6 +28,12 @@ import {
   AlertTriangle,
   IndianRupee,
   AlertCircle,
+  Download,
+  Printer,
+  Plus,
+  StickyNote,
+  ExternalLink,
+  MessageSquare,
 } from "lucide-react";
 
 type OrderStatus = "CREATED" | "PENDING_PAYMENT" | "PAID" | "CONFIRMED" | "SHIPPED" | "DELIVERED" | "CANCELLED" | "RETURNED";
@@ -39,6 +47,14 @@ const statusConfig: Record<string, { color: string; label: string; icon: React.R
   DELIVERED: { color: "bg-success/10 text-success border-success/20", label: "Delivered", icon: <CheckCircle2 className="h-3.5 w-3.5" /> },
   CANCELLED: { color: "bg-destructive/10 text-destructive border-destructive/20", label: "Cancelled", icon: <XCircle className="h-3.5 w-3.5" /> },
   RETURNED: { color: "bg-destructive/10 text-destructive border-destructive/20", label: "Returned", icon: <XCircle className="h-3.5 w-3.5" /> },
+};
+
+const paymentColors: Record<string, string> = {
+  PENDING: "bg-warning/10 text-warning border-warning/20",
+  PAID: "bg-success/10 text-success border-success/20",
+  FAILED: "bg-destructive/10 text-destructive border-destructive/20",
+  REFUNDED: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+  PARTIALLY_REFUNDED: "bg-blue-500/10 text-blue-600 border-blue-500/20",
 };
 
 // --- Collapsible Section Wrapper ---
@@ -87,6 +103,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const [copied, setCopied] = useState(false);
+  const [courierInput, setCourierInput] = useState("");
+  const [trackingInput, setTrackingInput] = useState("");
+  const [newNote, setNewNote] = useState("");
+  const [newMessage, setNewMessage] = useState("");
 
   const { data: order, isLoading, isError } = useQuery({
     queryKey: ["seller-order", id],
@@ -143,6 +163,20 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const totalAmount = parseFloat(order.totalAmount);
   const commission = parseFloat(order.commissionAmount);
   const netPayout = parseFloat(order.sellerPayableAmount);
+  const subtotal = parseFloat(order.subtotalAmount ?? order.totalAmount);
+  const grandTotal = totalAmount;
+
+  const addNote = () => {
+    if (!newNote.trim()) return;
+    setNewNote("");
+    toast.success("Note added");
+  };
+
+  const sendMessage = () => {
+    if (!newMessage.trim()) return;
+    setNewMessage("");
+    toast.success("Message sent");
+  };
 
   const actions: { label: string; onClick: () => void; variant?: "default" | "destructive" | "outline"; loading?: boolean }[] = [];
   if (order.status === "CONFIRMED") {
@@ -241,7 +275,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           {/* Desktop action bar */}
           {!isMobile && (
             <div className="flex flex-wrap gap-2.5 mt-6 pt-5 border-t border-primary/10">
-              {uniqueActions.map((a) => (
+              {actions.map((a) => (
                 <Button
                   key={a.label}
                   variant={a.variant || "outline"}
@@ -283,7 +317,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             icon={<ShoppingBag className="h-4 w-4" />}
           >
             <div className="space-y-4">
-              {order.items.map((item) => (
+              {order.items.map((item: any) => (
                 <div
                   key={item.id}
                   className="flex gap-4 items-start p-4 rounded-xl bg-muted/20 border border-border/40 hover:border-primary/20 transition-all"
@@ -386,18 +420,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   variant="ghost"
                   size="icon"
                   className="absolute top-2 right-2 h-8 w-8 rounded-lg hover:bg-background border border-transparent hover:border-border shadow-sm text-muted-foreground hover:text-primary transition-all"
-                  onClick={copyAddress}
+                  onClick={() => copyAddress(order.customer.address)}
                 >
                   <Copy className="h-3.5 w-3.5" />
                 </Button>
                 {copied && (
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="absolute -bottom-6 left-7 text-[10px] font-bold text-success uppercase tracking-wider"
-                  >
+                  <p className="absolute -bottom-6 left-7 text-[10px] font-bold text-success uppercase tracking-wider animate-fade-in">
                     Address copied!
-                  </motion.p>
+                  </p>
                 )}
               </div>
             </div>
@@ -408,7 +438,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           {/* ── 4. ORDER TIMELINE ── */}
           <Section title="Order Timeline" icon={<Clock className="h-4 w-4" />}>
             <div className="relative pl-2 py-2">
-              {order.timeline.map((step, i) => (
+              {order.timeline.map((step: any, i: number) => (
                 <div key={step.stage} className="relative pb-6 last:pb-0">
                   {/* Vertical line */}
                   {i < order.timeline.length - 1 && (
@@ -530,7 +560,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         >
           <div className="space-y-4">
             <div className="max-h-64 overflow-y-auto space-y-3 pr-1 no-scrollbar">
-              {order.messages.map((msg, i) => (
+              {order.messages.map((msg: any, i: number) => (
                 <div
                   key={i}
                   className={`p-3 rounded-2xl text-sm relative group ${msg.from === "Seller" ? "bg-primary/10 ml-8" : "bg-muted/40 mr-8"}`}
@@ -583,7 +613,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   </p>
                 </div>
               ) : (
-                order.notes.map((note, i) => (
+                order.notes.map((note: any, i: number) => (
                   <div
                     key={i}
                     className="p-3.5 rounded-xl bg-warning/[0.03] border border-warning/10 shadow-sm relative group overflow-hidden"
@@ -622,7 +652,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       {/* ── 9. MOBILE STICKY BOTTOM BAR ── */}
       {isMobile && (
         <div className="fixed bottom-0 left-0 right-0 z-50 bg-card/80 backdrop-blur-xl border-t border-border/60 p-4 pb-6 flex gap-3 overflow-x-auto no-scrollbar shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
-          {uniqueActions.map((a) => (
+          {actions.map((a) => (
             <Button
               key={a.label}
               variant={a.variant || "default"}

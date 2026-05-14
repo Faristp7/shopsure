@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@/lib/utils";
 import { PWASetup } from "@/components/pwa-setup";
 import { Toaster } from "sonner";
+import { ServerStatusCheck } from "@/components/server-status-check";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -44,6 +45,7 @@ export default function RootLayout({
         </ThemeProvider>
         <Toaster richColors position="top-right" />
         <PWASetup />
+        <ServerStatusCheck />
       </body>
     </html>
   );

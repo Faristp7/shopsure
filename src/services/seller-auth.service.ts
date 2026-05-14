@@ -1,5 +1,14 @@
 import { apiService } from "./api";
 import { AuthResponse, LoginResponse } from "@/types/auth";
+import { OnboardingSubmitData } from "./seller-onboarding.service";
+import { SellerStatus } from "@/types/seller";
+
+interface SellerProfileResponse {
+  status: SellerStatus;
+  rejectionReason: any;
+  redirectTo: string;
+  onboarding: OnboardingSubmitData | null;
+}
 
 export const sellerAuthService = {
   register: async (data: {
@@ -23,6 +32,6 @@ export const sellerAuthService = {
   },
 
   getProfile: async () => {
-    return apiService.get<any>("/v1/seller/profile");
+    return apiService.get<SellerProfileResponse>("/v1/seller/onboarding/details");
   },
 };

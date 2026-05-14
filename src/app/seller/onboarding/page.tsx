@@ -92,17 +92,13 @@ const OnboardingPage = () => {
     const fetchProfile = async () => {
       try {
         const profile = await sellerAuthService.getProfile();
-        setStatus(profile.status);
+        setStatus(profile.status as SellerStatus);
         if (profile.onboarding) {
           reset(profile.onboarding as OnboardingFormValues);
           if (profile.onboarding.logo_url) {
             setLogoPreview(profile.onboarding.logo_url);
             setValue("logo_url", profile.onboarding.logo_url);
           }
-        }
-
-        if (profile.status === SellerStatus.APPROVED) {
-          router.push("/seller/dashboard");
         }
       } catch (error) {
         console.error("Failed to fetch profile", error);
@@ -118,8 +114,8 @@ const OnboardingPage = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("Logo size must be less than 2MB");
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Logo size must be less than 5MB");
       return;
     }
 
@@ -171,7 +167,8 @@ const OnboardingPage = () => {
 
   const isPending = status === SellerStatus.PENDING_ADMIN_APPROVAL;
   const isRejected = status === SellerStatus.REJECTED;
-  const isDisabled = isPending || status === SellerStatus.APPROVED;
+  const isApproved = status === SellerStatus.APPROVED;
+  const isDisabled = isPending || isApproved;
 
   return (
     <div className="min-h-screen bg-background py-12 px-4 sm:px-6 lg:px-8">
@@ -189,6 +186,31 @@ const OnboardingPage = () => {
             customers.
           </p>
         </div>
+
+        {/* Approved View */}
+        {isApproved && (
+          <div className="bg-card border border-border rounded-3xl p-8 mb-8 text-center shadow-sm">
+            <div className="w-20 h-20 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircle2 className="w-10 h-10 text-success" />
+            </div>
+            <h2 className="text-2xl font-bold text-foreground mb-3">
+              Account Approved!
+            </h2>
+            <p className="text-muted-foreground max-w-md mx-auto mb-8">
+              Your account has been approved. Go on and login to access your dashboard.
+            </p>
+            <Button
+              onClick={() => {
+                document.cookie = 'accessToken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+                document.cookie = 'refreshToken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+                router.push("/seller");
+              }}
+              className="px-8 h-12 text-base rounded-xl"
+            >
+              Go to Login
+            </Button>
+          </div>
+        )}
 
         {/* Verification Pending View */}
         {isPending && (
@@ -261,7 +283,7 @@ const OnboardingPage = () => {
 
         {/* Form Container */}
         <div
-          className={`${isPending && !showForm ? "hidden" : "block"} space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500`}
+          className={`${(isPending || isApproved) && !showForm ? "hidden" : "block"} space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500`}
         >
           <form
             onSubmit={handleRHFSubmit(onSubmit)}
@@ -366,7 +388,7 @@ const OnboardingPage = () => {
                         Click to upload or drag and drop
                       </p>
                       <p className="text-xs text-muted-foreground mt-2">
-                        PNG, JPG up to 2MB
+                        PNG, JPG up to 5MB
                       </p>
                     </>
                   )}

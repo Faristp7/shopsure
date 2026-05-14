@@ -91,6 +91,8 @@ api.interceptors.response.use(
       } catch (err) {
         processQueue(err, null);
         if (typeof window !== 'undefined') {
+          // Clear accessToken cookie to prevent infinite loops
+          document.cookie = 'accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict';
           const returnPath = window.location.pathname + window.location.search;
           const q = `?callbackUrl=${encodeURIComponent(returnPath)}`;
           if (returnPath.startsWith('/seller')) {

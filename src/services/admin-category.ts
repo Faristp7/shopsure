@@ -28,7 +28,7 @@ export const adminCategoryService = {
     },
 
     updateCategory: async (id: string, data: Partial<Omit<Category, 'id' | 'createdAt' | 'updatedAt'>>) => {
-        return apiService.put<Category>(`v1/admin/categories/${id}`, data);
+        return apiService.patch<Category>(`v1/admin/categories/${id}`, data);
     },
 
     deleteCategory: async (id: string) => {

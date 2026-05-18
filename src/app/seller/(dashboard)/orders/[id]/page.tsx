@@ -242,7 +242,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 Order Value
               </p>
               <p className="text-xl font-extrabold text-foreground flex items-center gap-0.5 tabular-nums">
-                ₹{order.total.toLocaleString("en-IN")}
+                ₹{order?.total?.toLocaleString("en-IN")}
               </p>
             </div>
             <div className="space-y-1">
@@ -250,7 +250,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 Commission (10%)
               </p>
               <p className="text-xl font-extrabold text-destructive flex items-center gap-0.5 tabular-nums">
-                -{order.commission.toLocaleString("en-IN")}
+                -{order?.commission?.toLocaleString("en-IN")}
               </p>
             </div>
             <div className="space-y-1">
@@ -258,7 +258,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 Net Payout
               </p>
               <p className="text-2xl font-black text-success flex items-center gap-0.5 tabular-nums">
-                ₹{order.netPayout.toLocaleString("en-IN")}
+                ₹{order?.netPayout?.toLocaleString("en-IN")}
               </p>
             </div>
             <div className="space-y-1">
@@ -267,7 +267,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               </p>
               <p className="text-sm font-bold text-foreground flex items-center gap-1.5 mt-1">
                 <Clock className="h-4 w-4 text-warning" />
-                {order.expectedPayout}
+                {order?.expectedPayout}
               </p>
             </div>
           </div>
@@ -351,19 +351,19 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 <div className="flex justify-between font-medium">
                   <span className="text-muted-foreground">Subtotal</span>
                   <span className="text-foreground tabular-nums">
-                    ₹{subtotal.toLocaleString("en-IN")}
+                    ₹{subtotal?.toLocaleString("en-IN")}
                   </span>
                 </div>
                 <div className="flex justify-between font-medium">
                   <span className="text-muted-foreground">Shipping</span>
                   <span className="text-foreground">
-                    {order.shipping === 0 ? "Free" : `₹${order.shipping}`}
+                    {order?.shipping === 0 ? "Free" : `₹${order?.shipping}`}
                   </span>
                 </div>
                 <div className="flex justify-between font-medium">
                   <span className="text-muted-foreground">Commission</span>
                   <span className="text-destructive tabular-nums">
-                    -₹{order.commission.toLocaleString("en-IN")}
+                    -₹{order?.commission?.toLocaleString("en-IN")}
                   </span>
                 </div>
                 <Separator className="my-2 bg-border/40" />
@@ -372,7 +372,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     Grand Total
                   </span>
                   <span className="font-black text-lg text-foreground tabular-nums tracking-tight">
-                    ₹{grandTotal.toLocaleString("en-IN")}
+                    ₹{grandTotal?.toLocaleString("en-IN")}
                   </span>
                 </div>
               </div>
@@ -385,19 +385,19 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-base font-extrabold text-foreground">
-                    {order.customer.name}
+                    {order.customer?.name}
                   </p>
                   <div className="flex flex-wrap gap-4 mt-2">
                     <a
-                      href={`tel:${order.customer.phone}`}
+                      href={`tel:${order.customer?.phone}`}
                       className="text-xs font-bold text-primary flex items-center gap-1.5 hover:underline"
                     >
                       <Phone className="h-3.5 w-3.5" />
-                      {order.customer.phone}
+                      {order.customer?.phone}
                     </a>
                     <p className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
                       <Mail className="h-3.5 w-3.5" />
-                      {order.customer.email}
+                      {order.customer?.email}
                     </p>
                   </div>
                 </div>
@@ -407,11 +407,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   <MapPin className="h-4 w-4 mt-0.5 shrink-0 text-primary/60" />
                   <div className="flex-1 min-w-0 pr-8">
                     <p className="text-sm font-bold text-foreground leading-relaxed">
-                      {order.customer.address}
+                      {order.customer?.address}
                     </p>
-                    {order.customer.landmark && (
+                    {order.customer?.landmark && (
                       <p className="text-xs font-medium text-muted-foreground mt-1.5 bg-background/50 inline-block px-2 py-0.5 rounded border border-border/40">
-                        Landmark: {order.customer.landmark}
+                        Landmark: {order.customer?.landmark}
                       </p>
                     )}
                   </div>
@@ -438,10 +438,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           {/* ── 4. ORDER TIMELINE ── */}
           <Section title="Order Timeline" icon={<Clock className="h-4 w-4" />}>
             <div className="relative pl-2 py-2">
-              {order.timeline.map((step: any, i: number) => (
+              {order?.timeline?.map((step: any, i: number) => (
                 <div key={step.stage} className="relative pb-6 last:pb-0">
                   {/* Vertical line */}
-                  {i < order.timeline.length - 1 && (
+                  {i < (order?.timeline?.length || 0) - 1 && (
                     <div
                       className={`absolute left-1.5 top-4 w-0.5 h-full ${step.done ? "bg-success" : "bg-border/60"}`}
                     />
@@ -560,7 +560,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         >
           <div className="space-y-4">
             <div className="max-h-64 overflow-y-auto space-y-3 pr-1 no-scrollbar">
-              {order.messages.map((msg: any, i: number) => (
+              {order?.messages?.map((msg: any, i: number) => (
                 <div
                   key={i}
                   className={`p-3 rounded-2xl text-sm relative group ${msg.from === "Seller" ? "bg-primary/10 ml-8" : "bg-muted/40 mr-8"}`}
@@ -605,7 +605,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         >
           <div className="space-y-4">
             <div className="max-h-64 overflow-y-auto space-y-2 pr-1 no-scrollbar">
-              {order.notes.length === 0 ? (
+              {order?.notes?.length === 0 ? (
                 <div className="h-32 flex flex-col items-center justify-center text-muted-foreground/40 border-2 border-dashed border-border/40 rounded-xl">
                   <StickyNote className="h-8 w-8 mb-2" />
                   <p className="text-[10px] font-extrabold uppercase tracking-widest">
@@ -613,7 +613,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   </p>
                 </div>
               ) : (
-                order.notes.map((note: any, i: number) => (
+                order?.notes?.map((note: any, i: number) => (
                   <div
                     key={i}
                     className="p-3.5 rounded-xl bg-warning/[0.03] border border-warning/10 shadow-sm relative group overflow-hidden"

@@ -15,6 +15,10 @@ export interface Category {
     subCategories?: Category[];
     createdAt: string;
     updatedAt: string;
+    _count?: {
+        children: number;
+        products: number;
+    };
 }
 
 export interface ListCategoriesQuery {

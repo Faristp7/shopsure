@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAuth, Address } from "../../context/AuthContext";
+import { useLocation } from "../../context/LocationContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +12,8 @@ import { MapPin, Plus, Pencil, Trash2, Check } from "lucide-react";
 const emptyForm = { label: "", name: "", phone: "", street: "", city: "", state: "", zip: "", isDefault: false };
 
 export default function AddressPage() {
-  const { isLoggedIn, addresses, addAddress, updateAddress, deleteAddress } = useAuth();
+  const { user, addresses, addAddress, updateAddress, deleteAddress } = useAuth();
+  const { location } = useLocation();
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -19,7 +21,16 @@ export default function AddressPage() {
   // if (!isLoggedIn) return null; 
   // Handled by layout
 
-  const openAdd = () => { setEditId(null); setForm(emptyForm); setOpen(true); };
+  const openAdd = () => {
+    setEditId(null);
+    setForm({
+      ...emptyForm,
+      name: user?.name ?? "",
+      city: location?.city ?? "",
+      state: location?.state ?? "",
+    });
+    setOpen(true);
+  };
   const openEdit = (addr: Address) => { 
     setEditId(addr.id); 
     setForm({ 

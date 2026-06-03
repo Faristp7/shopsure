@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Heart, Star, Package, Truck, CalendarCheck, Percent, ShoppingBag, Check, Loader2, BellRing, ThumbsUp, Send } from "lucide-react";
 import { useCart } from "../../context/CartContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -79,8 +80,10 @@ function ProductGallery({
 type AddStatus = "idle" | "loading" | "success" | "error";
 
 function ProductInfo({ product }: { product: BuyerProductDetail }) {
+  const router = useRouter();
   const [wishlisted, setWishlisted] = useState(false);
   const [addStatus, setAddStatus] = useState<AddStatus>("idle");
+  const [buyNowLoading, setBuyNowLoading] = useState(false);
   const { addItem } = useCart();
 
   const price = parseFloat(product.price);
@@ -144,6 +147,31 @@ function ProductInfo({ product }: { product: BuyerProductDetail }) {
     setAddStatus(ok ? "success" : "error");
     setTimeout(() => setAddStatus("idle"), 1800);
   }, [addStatus, isOutOfStock, addItem, product, price, originalPrice, selectedVariantLabel, effectiveStock]);
+
+  const handleBuyNow = useCallback(async () => {
+    if (isOutOfStock || buyNowLoading) return;
+    const coverImage =
+      Array.isArray(product.images)
+        ? (product.images.find((img) => img.isCover) ?? product.images[0])?.url
+        : undefined;
+
+    setBuyNowLoading(true);
+    const ok = await addItem({
+      id: product.id,
+      name: product.title,
+      price,
+      originalPrice: originalPrice ?? undefined,
+      quantity: 1,
+      variant: selectedVariantLabel || undefined,
+      image: coverImage ?? "",
+      stock: effectiveStock,
+    });
+    if (ok) {
+      router.push("/checkout");
+    } else {
+      setBuyNowLoading(false);
+    }
+  }, [isOutOfStock, buyNowLoading, addItem, product, price, originalPrice, selectedVariantLabel, effectiveStock, router]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -328,14 +356,26 @@ function ProductInfo({ product }: { product: BuyerProductDetail }) {
 
         {/* Buy Now — also disabled + distinct style when OOS */}
         <button
-          disabled={isOutOfStock}
+          onClick={handleBuyNow}
+          disabled={isOutOfStock || buyNowLoading}
           className={`w-full font-semibold py-3.5 rounded-full text-sm transition-all active:scale-[0.98]
             ${isOutOfStock
               ? "border border-border text-muted-foreground bg-muted cursor-not-allowed"
+              : buyNowLoading
+              ? "bg-primary/80 text-primary-foreground cursor-wait"
               : "border border-primary text-foreground hover:bg-primary hover:text-primary-foreground"
             }`}
         >
-          {isOutOfStock ? "Currently Unavailable" : "Buy Now"}
+          {isOutOfStock ? (
+            "Currently Unavailable"
+          ) : buyNowLoading ? (
+            <span className="flex items-center justify-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Processing...
+            </span>
+          ) : (
+            "Buy Now"
+          )}
         </button>
       </div>
     </div>

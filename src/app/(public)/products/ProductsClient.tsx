@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -19,7 +19,170 @@ import { buyerProductService } from "@/services/buyer-product.service";
 import { buyerCategoryService } from "@/services/buyer-category.service";
 import { useDebounce } from "@/hooks/use-debounce";
 import type { BuyerProduct } from "@/types/product";
+import type { Category } from "@/types/category";
 import { ProductsGridSkeleton } from "./ProductsSkeleton";
+
+export interface CategoryTreeNode extends Category {
+  childrenNodes: CategoryTreeNode[];
+}
+
+export function buildCategoryTree(flatCategories: Category[]): CategoryTreeNode[] {
+  const map = new Map<string, CategoryTreeNode>();
+  const roots: CategoryTreeNode[] = [];
+
+  flatCategories.forEach((cat) => {
+    map.set(cat.id, { ...cat, childrenNodes: [] });
+  });
+
+  flatCategories.forEach((cat) => {
+    const node = map.get(cat.id)!;
+    if (cat.parentId && map.has(cat.parentId)) {
+      map.get(cat.parentId)!.childrenNodes.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+
+  const sortNodes = (nodes: CategoryTreeNode[]) => {
+    nodes.sort((a, b) => {
+      const orderA = a.sortOrder ?? 0;
+      const orderB = b.sortOrder ?? 0;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.name.localeCompare(b.name);
+    });
+    nodes.forEach((node) => {
+      if (node.childrenNodes.length > 0) {
+        sortNodes(node.childrenNodes);
+      }
+    });
+  };
+
+  sortNodes(roots);
+  return roots;
+}
+
+export function getRecursiveProductCount(node: CategoryTreeNode): number {
+  const directCount = node._count?.products ?? 0;
+  const childrenCount = node.childrenNodes.reduce(
+    (sum, child) => sum + getRecursiveProductCount(child),
+    0
+  );
+  return directCount + childrenCount;
+}
+
+export function filterCategoryTree(
+  nodes: CategoryTreeNode[],
+  query: string
+): CategoryTreeNode[] {
+  const lowercaseQuery = query.toLowerCase();
+  return nodes
+    .map((node) => {
+      const childrenMatched = filterCategoryTree(node.childrenNodes, query);
+      const selfMatched = node.name.toLowerCase().includes(lowercaseQuery);
+      if (selfMatched || childrenMatched.length > 0) {
+        return {
+          ...node,
+          childrenNodes: childrenMatched,
+        };
+      }
+      return null;
+    })
+    .filter((n): n is CategoryTreeNode => n !== null);
+}
+
+interface CategoryTreeProps {
+  nodes: CategoryTreeNode[];
+  level?: number;
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
+  expandedMap: Record<string, boolean>;
+  onToggleExpand: (id: string) => void;
+  isSearchActive: boolean;
+}
+
+function CategoryTreeRender({
+  nodes,
+  level = 0,
+  selectedId,
+  onSelect,
+  expandedMap,
+  onToggleExpand,
+  isSearchActive,
+}: CategoryTreeProps) {
+  return (
+    <div className="space-y-1">
+      {nodes.map((node) => {
+        const hasChildren = node.childrenNodes.length > 0;
+        const isExpanded = isSearchActive || !!expandedMap[node.id];
+        const isSelected = selectedId === node.id;
+        const totalProductCount = getRecursiveProductCount(node);
+
+        return (
+          <div key={node.id} className="space-y-1">
+            <div
+              className={`group flex items-center justify-between rounded-xl px-2 py-1.5 transition-all duration-200 ${
+                isSelected
+                  ? "bg-primary/10 text-primary font-semibold border-l-2 border-primary"
+                  : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+              }`}
+              style={{ paddingLeft: `${Math.max(8, level * 16)}px` }}
+            >
+              <button
+                onClick={() => onSelect(node.id)}
+                className="flex-1 text-left text-sm flex items-center gap-1.5 min-w-0"
+              >
+                <span className="truncate">{node.name}</span>
+                {totalProductCount > 0 && (
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                      isSelected
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary text-muted-foreground"
+                    }`}
+                  >
+                    {totalProductCount}
+                  </span>
+                )}
+              </button>
+
+              {hasChildren && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleExpand(node.id);
+                  }}
+                  className={`p-1 rounded-lg hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors ${
+                    isSearchActive ? "opacity-30 pointer-events-none" : ""
+                  }`}
+                >
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                      isExpanded ? "rotate-0" : "-rotate-90"
+                    }`}
+                  />
+                </button>
+              )}
+            </div>
+
+            {hasChildren && isExpanded && (
+              <div className="mt-0.5">
+                <CategoryTreeRender
+                  nodes={node.childrenNodes}
+                  level={level + 1}
+                  selectedId={selectedId}
+                  onSelect={onSelect}
+                  expandedMap={expandedMap}
+                  onToggleExpand={onToggleExpand}
+                  isSearchActive={isSearchActive}
+                />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 const priceRanges = [
   { label: "All Prices", min: 0, max: Infinity },
@@ -76,6 +239,11 @@ export default function ProductsClient({
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [page, setPage] = useState(initialPage);
 
+  // Category sidebar states
+  const [categorySearch, setCategorySearch] = useState("");
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+  const [showAllCategories, setShowAllCategories] = useState(false);
+
   const debouncedSearch = useDebounce(searchInput, 400);
 
   const { data: categoriesData } = useQuery({
@@ -99,6 +267,48 @@ export default function ProductsClient({
   });
 
   const categories = categoriesData?.items ?? [];
+
+  // Build the hierarchical category tree
+  const categoryTree = useMemo(() => {
+    return buildCategoryTree(categories);
+  }, [categories]);
+
+  // Filter the category tree based on category search query
+  const filteredCategoryTree = useMemo(() => {
+    if (!categorySearch.trim()) return categoryTree;
+    return filterCategoryTree(categoryTree, categorySearch);
+  }, [categoryTree, categorySearch]);
+
+  // Auto-expand parents of selected category
+  useEffect(() => {
+    if (!selectedCategoryId || categories.length === 0) return;
+
+    const parentIds: string[] = [];
+    let currentId = selectedCategoryId;
+    while (currentId) {
+      const cat = categories.find((c) => c.id === currentId);
+      if (cat?.parentId) {
+        parentIds.push(cat.parentId);
+        currentId = cat.parentId;
+      } else {
+        break;
+      }
+    }
+
+    if (parentIds.length > 0) {
+      setExpandedCategories((prev) => {
+        const next = { ...prev };
+        let changed = false;
+        parentIds.forEach((id) => {
+          if (!next[id]) {
+            next[id] = true;
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    }
+  }, [selectedCategoryId, categories]);
 
   const filtered = useMemo(() => {
     let items = data?.items ?? [];
@@ -177,117 +387,168 @@ export default function ProductsClient({
     setPage(1);
   };
 
-  const FilterPanel = ({ mobile = false }: { mobile?: boolean }) => (
-    <div className={mobile ? "" : "space-y-6"}>
-      <div className={mobile ? "mb-6" : ""}>
-        <h4 className="text-sm font-semibold text-foreground mb-3">Category</h4>
-        <div className="space-y-1.5">
-          <button
-            onClick={() => handleCategoryChange(null)}
-            className={`block w-full text-left text-sm px-3 py-2 rounded-xl transition-colors ${
-              selectedCategoryId === null
-                ? "bg-primary text-primary-foreground font-medium"
-                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-            }`}
-          >
-            All
-          </button>
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => handleCategoryChange(cat.id)}
-              className={`block w-full text-left text-sm px-3 py-2 rounded-xl transition-colors ${
-                selectedCategoryId === cat.id
-                  ? "bg-primary text-primary-foreground font-medium"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-              }`}
-            >
-              {cat.name}
-            </button>
-          ))}
-        </div>
-      </div>
+  const FilterPanel = ({ mobile = false }: { mobile?: boolean }) => {
+    const toggleExpandCategory = (id: string) => {
+      setExpandedCategories((prev) => ({ ...prev, [id]: !prev[id] }));
+    };
 
-      <div className={mobile ? "mb-6" : ""}>
-        <h4 className="text-sm font-semibold text-foreground mb-3">Price Range</h4>
-        <div className="space-y-1.5">
-          {priceRanges.map((range, i) => (
-            <button
-              key={range.label}
-              onClick={() => setSelectedPrice(i)}
-              className={`block w-full text-left text-sm px-3 py-2 rounded-xl transition-colors ${
-                selectedPrice === i
-                  ? "bg-primary text-primary-foreground font-medium"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-              }`}
-            >
-              {range.label}
-            </button>
-          ))}
-        </div>
-      </div>
+    const isSearchActive = categorySearch.trim().length > 0;
 
-      {brands.length > 1 && (
+    const visibleRoots = isSearchActive || showAllCategories
+      ? filteredCategoryTree
+      : filteredCategoryTree.slice(0, 6);
+
+    return (
+      <div className={mobile ? "" : "space-y-6"}>
         <div className={mobile ? "mb-6" : ""}>
-          <h4 className="text-sm font-semibold text-foreground mb-3">Brand</h4>
-          <div className="space-y-1.5 max-h-48 overflow-y-auto scrollbar-hide">
-            {brands.map((brand) => (
+          <h4 className="text-sm font-semibold text-foreground mb-3">Category</h4>
+
+          {/* Category Search Input */}
+          <div className="relative mb-3 px-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search categories..."
+              value={categorySearch}
+              onChange={(e) => setCategorySearch(e.target.value)}
+              className="w-full bg-secondary/60 text-xs text-foreground pl-9 pr-8 py-2 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 border border-transparent focus:border-muted-foreground/10 transition-all"
+            />
+            {categorySearch && (
               <button
-                key={brand}
-                onClick={() => setSelectedBrand(brand)}
+                onClick={() => setCategorySearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-secondary transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            {/* All Products Option */}
+            <button
+              onClick={() => handleCategoryChange(null)}
+              className={`block w-full text-left text-sm px-3 py-2 rounded-xl transition-all duration-200 ${
+                selectedCategoryId === null
+                  ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+              }`}
+            >
+              All Products
+            </button>
+
+            {/* Recursive Tree Render */}
+            {visibleRoots.length > 0 ? (
+              <CategoryTreeRender
+                nodes={visibleRoots}
+                selectedId={selectedCategoryId}
+                onSelect={handleCategoryChange}
+                expandedMap={expandedCategories}
+                onToggleExpand={toggleExpandCategory}
+                isSearchActive={isSearchActive}
+              />
+            ) : (
+              <div className="text-xs text-muted-foreground py-3 text-center">
+                No matching categories
+              </div>
+            )}
+
+            {/* Show More / Show Less Controls */}
+            {filteredCategoryTree.length > 6 && !isSearchActive && (
+              <button
+                onClick={() => setShowAllCategories(!showAllCategories)}
+                className="mt-2 text-xs font-semibold text-primary hover:text-primary/85 transition-colors flex items-center gap-1 w-full px-3 py-1.5 rounded-lg hover:bg-primary/5"
+              >
+                {showAllCategories ? (
+                  <span>Show Less</span>
+                ) : (
+                  <span>Show More (+{filteredCategoryTree.length - 6})</span>
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className={mobile ? "mb-6" : ""}>
+          <h4 className="text-sm font-semibold text-foreground mb-3">Price Range</h4>
+          <div className="space-y-1.5">
+            {priceRanges.map((range, i) => (
+              <button
+                key={range.label}
+                onClick={() => setSelectedPrice(i)}
                 className={`block w-full text-left text-sm px-3 py-2 rounded-xl transition-colors ${
-                  selectedBrand === brand
+                  selectedPrice === i
                     ? "bg-primary text-primary-foreground font-medium"
                     : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                 }`}
               >
-                {brand}
+                {range.label}
               </button>
             ))}
           </div>
         </div>
-      )}
 
-      <div>
-        <h4 className="text-sm font-semibold text-foreground mb-3">Rating</h4>
-        <div className="space-y-1.5">
-          <button
-            onClick={() => setSelectedRating(0)}
-            className={`block w-full text-left text-sm px-3 py-2 rounded-xl transition-colors ${
-              selectedRating === 0
-                ? "bg-primary text-primary-foreground font-medium"
-                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-            }`}
-          >
-            All Ratings
-          </button>
-          {ratings.map((r) => (
+        {brands.length > 1 && (
+          <div className={mobile ? "mb-6" : ""}>
+            <h4 className="text-sm font-semibold text-foreground mb-3">Brand</h4>
+            <div className="space-y-1.5 max-h-48 overflow-y-auto scrollbar-hide">
+              {brands.map((brand) => (
+                <button
+                  key={brand}
+                  onClick={() => setSelectedBrand(brand)}
+                  className={`block w-full text-left text-sm px-3 py-2 rounded-xl transition-colors ${
+                    selectedBrand === brand
+                      ? "bg-primary text-primary-foreground font-medium"
+                      : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  }`}
+                >
+                  {brand}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div>
+          <h4 className="text-sm font-semibold text-foreground mb-3">Rating</h4>
+          <div className="space-y-1.5">
             <button
-              key={r}
-              onClick={() => setSelectedRating(r)}
-              className={`flex items-center gap-1.5 w-full text-left text-sm px-3 py-2 rounded-xl transition-colors ${
-                selectedRating === r
+              onClick={() => setSelectedRating(0)}
+              className={`block w-full text-left text-sm px-3 py-2 rounded-xl transition-colors ${
+                selectedRating === 0
                   ? "bg-primary text-primary-foreground font-medium"
                   : "text-muted-foreground hover:bg-secondary hover:text-foreground"
               }`}
             >
-              <div className="flex gap-0.5">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star
-                    key={i}
-                    className={`w-3.5 h-3.5 ${
-                      i < r ? "fill-star text-star" : "text-muted"
-                    }`}
-                  />
-                ))}
-              </div>
-              <span className="ml-1">& Up</span>
+              All Ratings
             </button>
-          ))}
+            {ratings.map((r) => (
+              <button
+                key={r}
+                onClick={() => setSelectedRating(r)}
+                className={`flex items-center gap-1.5 w-full text-left text-sm px-3 py-2 rounded-xl transition-colors ${
+                  selectedRating === r
+                    ? "bg-primary text-primary-foreground font-medium"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                }`}
+              >
+                <div className="flex gap-0.5">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Star
+                      key={i}
+                      className={`w-3.5 h-3.5 ${
+                        i < r ? "fill-star text-star" : "text-muted"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <span className="ml-1">& Up</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="container py-6">

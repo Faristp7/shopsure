@@ -3,11 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ShoppingBag, Search, MapPin, ChevronDown, User, LogIn, UserPlus, Package, Heart, Settings, LogOut, Navigation } from "lucide-react";
+import { ShoppingBag, Search, MapPin, ChevronDown, User, LogIn, UserPlus, Package, Heart, Settings, LogOut } from "lucide-react";
 import { SearchBar } from "@/components/public/SearchBar";
 import { ChatBot } from "@/components/public/ChatBot";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
+import { useLocation } from "../context/LocationContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,39 +16,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-
-const cities = [
-  { name: "New York", state: "NY" },
-  { name: "Los Angeles", state: "CA" },
-  { name: "Chicago", state: "IL" },
-  { name: "Houston", state: "TX" },
-  { name: "Phoenix", state: "AZ" },
-  { name: "Philadelphia", state: "PA" },
-  { name: "San Antonio", state: "TX" },
-  { name: "San Diego", state: "CA" },
-  { name: "Dallas", state: "TX" },
-  { name: "Miami", state: "FL" },
-];
+import { LocationSelector } from "./LocationSelector";
 
 const Navbar = () => {
   const { itemCount } = useCart();
   const { isLoggedIn, user, logout, setShowLogin, setShowSignup } = useAuth();
+  const { location, isDetecting } = useLocation();
   const router = useRouter();
   const [locationOpen, setLocationOpen] = useState(false);
-  const [selectedCity, setSelectedCity] = useState("New York");
-  const [citySearch, setCitySearch] = useState("");
-
-  const filteredCities = cities.filter(
-    (c) =>
-      c.name.toLowerCase().includes(citySearch.toLowerCase()) ||
-      c.state.toLowerCase().includes(citySearch.toLowerCase())
-  );
+  const locationLabel = location?.city || location?.label || (isDetecting ? "Detecting..." : "Select location");
 
   return (
     <>
@@ -70,7 +47,7 @@ const Navbar = () => {
             className="hidden md:flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0"
           >
             <MapPin className="w-4 h-4" />
-            <span>{selectedCity}</span>
+            <span>{locationLabel}</span>
             <ChevronDown className="w-3.5 h-3.5" />
           </button>
 
@@ -140,45 +117,7 @@ const Navbar = () => {
         </div>
       </header>
 
-      <Dialog open={locationOpen} onOpenChange={setLocationOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-primary" />
-              Select your location
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <button className="w-full flex items-center gap-3 p-3 rounded-xl border border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 transition-colors text-sm font-medium">
-              <Navigation className="w-4 h-4" />
-              Use my current location
-            </button>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search city..."
-                value={citySearch}
-                onChange={(e) => setCitySearch(e.target.value)}
-                className="w-full bg-secondary text-sm rounded-xl py-2.5 pl-9 pr-3 outline-none focus:ring-2 focus:ring-ring/20 transition-all placeholder:text-muted-foreground"
-              />
-            </div>
-            <div className="max-h-60 overflow-y-auto space-y-1">
-              {filteredCities.map((city) => (
-                <button
-                  key={city.name}
-                  onClick={() => { setSelectedCity(city.name); setLocationOpen(false); setCitySearch(""); }}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors ${selectedCity === city.name ? "bg-primary/10 text-primary font-medium" : "hover:bg-secondary text-foreground"}`}
-                >
-                  <span>{city.name}</span>
-                  <span className="text-muted-foreground text-xs">{city.state}</span>
-                </button>
-              ))}
-              {filteredCities.length === 0 && <p className="text-center text-muted-foreground text-sm py-4">No cities found</p>}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <LocationSelector open={locationOpen} onOpenChange={setLocationOpen} />
     </>
   );
 };

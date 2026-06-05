@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, CreditCard, Truck, Shield, CheckCircle2 } from "lucide-react";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { ordersService } from "@/services/orders.service";
+import { couponsService, type CouponValidationResult } from "@/services/coupons.service";
 import { toast } from "sonner";
+
+const APPLIED_COUPON_STORAGE_KEY = "shopsure_applied_coupon_code";
 
 const CheckoutPage = () => {
   const router = useRouter();
@@ -17,13 +20,46 @@ const CheckoutPage = () => {
   const subtotal = total;
   const shipping = subtotal >= 999 ? 0 : 99;
   const tax = +(subtotal * 0.18).toFixed(2);
-  const grandTotal = +(subtotal + shipping + tax).toFixed(2);
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponValidationResult | null>(null);
+  const grandTotal = +(subtotal + shipping + tax - (appliedCoupon?.discountAmount ?? 0)).toFixed(2);
 
   const defaultAddress = addresses.find((a) => a.isDefault) ?? addresses[0] ?? null;
 
   const [selectedPayment, setSelectedPayment] = useState<"COD" | "PREPAID">("COD");
   const [isPlacing, setIsPlacing] = useState(false);
   const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const storedCode =
+      typeof window !== "undefined"
+        ? window.localStorage.getItem(APPLIED_COUPON_STORAGE_KEY)
+        : null;
+
+    if (!storedCode || subtotal <= 0) {
+      setAppliedCoupon(null);
+      return;
+    }
+
+    let ignore = false;
+
+    void couponsService
+      .validateCoupon({ code: storedCode, orderAmount: subtotal })
+      .then((result) => {
+        if (!ignore) {
+          setAppliedCoupon(result);
+        }
+      })
+      .catch(() => {
+        if (!ignore) {
+          setAppliedCoupon(null);
+          window.localStorage.removeItem(APPLIED_COUPON_STORAGE_KEY);
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [subtotal]);
 
   const handlePlaceOrder = async () => {
     if (!defaultAddress) {
@@ -45,8 +81,12 @@ const CheckoutPage = () => {
         shippingState: defaultAddress.state,
         shippingZip: defaultAddress.zip,
         paymentMethod: selectedPayment,
+        couponCode: appliedCoupon?.code,
       });
       await clearCart();
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(APPLIED_COUPON_STORAGE_KEY);
+      }
       setPlacedOrderId(order.id);
     } catch (err: any) {
       const msg = err?.response?.data?.message ?? "Failed to place order. Please try again.";
@@ -185,6 +225,14 @@ const CheckoutPage = () => {
                 <span className="text-muted-foreground">Tax (GST 18%)</span>
                 <span className="font-medium text-foreground">₹{tax.toLocaleString("en-IN")}</span>
               </div>
+              {appliedCoupon && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Coupon ({appliedCoupon.code})</span>
+                  <span className="font-medium text-success">
+                    -₹{appliedCoupon.discountAmount.toLocaleString("en-IN")}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="border-t border-border mt-4 pt-4 flex justify-between">

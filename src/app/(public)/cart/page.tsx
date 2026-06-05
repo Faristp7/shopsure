@@ -1,21 +1,91 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, X, Minus, Plus, RefreshCw, AlertCircle, Loader2 } from "lucide-react";
 import { useCart } from "../context/CartContext";
+import { couponsService, type CouponValidationResult } from "@/services/coupons.service";
+import { toast } from "sonner";
+
+const APPLIED_COUPON_STORAGE_KEY = "shopsure_applied_coupon_code";
 
 const CartPage = () => {
   const { items, removeItem, updateQuantity, clearCart, total, isLoading, error } = useCart();
   const router = useRouter();
   const [coupon, setCoupon] = useState("");
-  const [couponApplied, setCouponApplied] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponValidationResult | null>(null);
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
 
   const shipping = total > 50 ? 0 : 5.99;
   const tax = 0;
   const subtotal = total;
-  const grandTotal = subtotal + shipping + tax;
+  const discount = appliedCoupon?.discountAmount ?? 0;
+  const grandTotal = subtotal + shipping + tax - discount;
+
+  useEffect(() => {
+    const storedCode =
+      typeof window !== "undefined"
+        ? window.localStorage.getItem(APPLIED_COUPON_STORAGE_KEY)
+        : null;
+
+    if (!storedCode || subtotal <= 0) {
+      setAppliedCoupon(null);
+      return;
+    }
+
+    setCoupon(storedCode);
+    let ignore = false;
+
+    void couponsService
+      .validateCoupon({ code: storedCode, orderAmount: subtotal })
+      .then((result) => {
+        if (ignore) return;
+        setAppliedCoupon(result);
+      })
+      .catch(() => {
+        if (ignore) return;
+        setAppliedCoupon(null);
+        window.localStorage.removeItem(APPLIED_COUPON_STORAGE_KEY);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [subtotal]);
+
+  const handleApplyCoupon = async () => {
+    if (!coupon.trim()) {
+      toast.error("Enter a coupon code first.");
+      return;
+    }
+
+    setIsApplyingCoupon(true);
+    try {
+      const result = await couponsService.validateCoupon({
+        code: coupon.trim().toUpperCase(),
+        orderAmount: subtotal,
+      });
+      setCoupon(result.code);
+      setAppliedCoupon(result);
+      window.localStorage.setItem(APPLIED_COUPON_STORAGE_KEY, result.code);
+      toast.success("Coupon applied.");
+    } catch (err: any) {
+      setAppliedCoupon(null);
+      window.localStorage.removeItem(APPLIED_COUPON_STORAGE_KEY);
+      toast.error(err?.response?.data?.message ?? "Could not apply coupon.");
+    } finally {
+      setIsApplyingCoupon(false);
+    }
+  };
+
+  const clearAppliedCoupon = () => {
+    setAppliedCoupon(null);
+    setCoupon("");
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(APPLIED_COUPON_STORAGE_KEY);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -135,16 +205,30 @@ const CartPage = () => {
                   <input
                     type="text"
                     value={coupon}
-                    onChange={(e) => setCoupon(e.target.value)}
+                    onChange={(e) => {
+                      setCoupon(e.target.value.toUpperCase());
+                      if (appliedCoupon && e.target.value.toUpperCase() !== appliedCoupon.code) {
+                        setAppliedCoupon(null);
+                      }
+                    }}
                     placeholder="Coupon code"
                     className="flex-1 min-w-[140px] max-w-xs bg-card border border-border text-sm rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-ring/20 transition-all placeholder:text-muted-foreground"
                   />
                   <button
-                    onClick={() => coupon && setCouponApplied(true)}
-                    className="border border-border text-sm font-semibold text-foreground px-5 py-2.5 rounded-xl hover:bg-secondary transition-colors uppercase tracking-wider"
+                    onClick={handleApplyCoupon}
+                    disabled={isApplyingCoupon || subtotal <= 0}
+                    className="border border-border text-sm font-semibold text-foreground px-5 py-2.5 rounded-xl hover:bg-secondary transition-colors uppercase tracking-wider disabled:opacity-50"
                   >
-                    Apply
+                    {isApplyingCoupon ? "Applying..." : "Apply"}
                   </button>
+                  {appliedCoupon ? (
+                    <button
+                      onClick={clearAppliedCoupon}
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Remove coupon
+                    </button>
+                  ) : null}
                   <button
                     onClick={() => clearCart()}
                     disabled={isLoading || items.length === 0}
@@ -153,8 +237,10 @@ const CartPage = () => {
                     <RefreshCw className="w-4 h-4" /> Clear Cart
                   </button>
                 </div>
-                {couponApplied && (
-                  <p className="text-xs text-success mt-2">Coupon applied successfully!</p>
+                {appliedCoupon && (
+                  <p className="text-xs text-success mt-2">
+                    {appliedCoupon.code} applied. You saved ₹{appliedCoupon.discountAmount.toFixed(2)}.
+                  </p>
                 )}
               </div>
             </div>
@@ -176,6 +262,12 @@ const CartPage = () => {
                     <span className="text-muted-foreground">Subtotal</span>
                     <span className="font-medium text-foreground">₹{subtotal.toFixed(2)}</span>
                   </div>
+                  {appliedCoupon && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Coupon ({appliedCoupon.code})</span>
+                      <span className="font-medium text-success">-₹{appliedCoupon.discountAmount.toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="border-t border-border mt-4 pt-4 flex justify-between">
                   <span className="text-base font-bold text-foreground">Total</span>

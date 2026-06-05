@@ -1,26 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, CreditCard, Truck, Shield, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, CreditCard, Truck, Shield, CheckCircle2, AlertCircle } from "lucide-react";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { ordersService } from "@/services/orders.service";
-import { couponsService, type CouponValidationResult } from "@/services/coupons.service";
 import { toast } from "sonner";
 
-const APPLIED_COUPON_STORAGE_KEY = "shopsure_applied_coupon_code";
-
 const CheckoutPage = () => {
-  const router = useRouter();
-  const { items, total, clearCart } = useCart();
+  const { items, total, clearCart, appliedCoupon, couponError, removeCoupon } = useCart();
   const { addresses } = useAuth();
 
   const subtotal = total;
-  const shipping = subtotal >= 999 ? 0 : 99;
+  const shipping = subtotal >= 999 || subtotal === 0 ? 0 : 99;
   const tax = +(subtotal * 0.18).toFixed(2);
-  const [appliedCoupon, setAppliedCoupon] = useState<CouponValidationResult | null>(null);
   const grandTotal = +(subtotal + shipping + tax - (appliedCoupon?.discountAmount ?? 0)).toFixed(2);
 
   const defaultAddress = addresses.find((a) => a.isDefault) ?? addresses[0] ?? null;
@@ -28,38 +22,6 @@ const CheckoutPage = () => {
   const [selectedPayment, setSelectedPayment] = useState<"COD" | "PREPAID">("COD");
   const [isPlacing, setIsPlacing] = useState(false);
   const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const storedCode =
-      typeof window !== "undefined"
-        ? window.localStorage.getItem(APPLIED_COUPON_STORAGE_KEY)
-        : null;
-
-    if (!storedCode || subtotal <= 0) {
-      setAppliedCoupon(null);
-      return;
-    }
-
-    let ignore = false;
-
-    void couponsService
-      .validateCoupon({ code: storedCode, orderAmount: subtotal })
-      .then((result) => {
-        if (!ignore) {
-          setAppliedCoupon(result);
-        }
-      })
-      .catch(() => {
-        if (!ignore) {
-          setAppliedCoupon(null);
-          window.localStorage.removeItem(APPLIED_COUPON_STORAGE_KEY);
-        }
-      });
-
-    return () => {
-      ignore = true;
-    };
-  }, [subtotal]);
 
   const handlePlaceOrder = async () => {
     if (!defaultAddress) {
@@ -81,21 +43,18 @@ const CheckoutPage = () => {
         shippingState: defaultAddress.state,
         shippingZip: defaultAddress.zip,
         paymentMethod: selectedPayment,
-        couponCode: appliedCoupon?.code,
+        couponCode: couponError ? undefined : appliedCoupon?.code,
       });
       await clearCart();
-      if (typeof window !== "undefined") {
-        window.localStorage.removeItem(APPLIED_COUPON_STORAGE_KEY);
-      }
+      removeCoupon();
       setPlacedOrderId(order.id);
-    } catch (err: any) {
-      const msg = err?.response?.data?.message ?? "Failed to place order. Please try again.";
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Failed to place order. Please try again.";
       toast.error(msg);
     } finally {
       setIsPlacing(false);
     }
   };
-
   if (placedOrderId) {
     return (
       <main className="container py-20 text-center">
@@ -195,6 +154,16 @@ const CheckoutPage = () => {
         <div>
           <div className="bg-card rounded-2xl shadow-card p-6 sticky top-24">
             <h2 className="text-lg font-bold text-foreground uppercase tracking-tight mb-4">Order Summary</h2>
+
+            {couponError && (
+              <div className="bg-destructive/10 border border-destructive/25 text-destructive text-xs rounded-xl p-3.5 mb-4 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-semibold">Coupon Disabled</p>
+                  <p className="mt-0.5 leading-relaxed text-muted-foreground">{couponError}. Proceeding without this discount.</p>
+                </div>
+              </div>
+            )}
 
             <div className="flex flex-col divide-y divide-border mb-4 max-h-[300px] overflow-y-auto scrollbar-hide">
               {items.map((item) => (

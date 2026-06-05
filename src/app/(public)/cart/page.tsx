@@ -1,90 +1,63 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, X, Minus, Plus, RefreshCw, AlertCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, X, Minus, Plus, RefreshCw, AlertCircle, Loader2, Tag, Check, Ticket } from "lucide-react";
 import { useCart } from "../context/CartContext";
-import { couponsService, type CouponValidationResult } from "@/services/coupons.service";
 import { toast } from "sonner";
 
-const APPLIED_COUPON_STORAGE_KEY = "shopsure_applied_coupon_code";
-
 const CartPage = () => {
-  const { items, removeItem, updateQuantity, clearCart, total, isLoading, error } = useCart();
+  const {
+    items,
+    removeItem,
+    updateQuantity,
+    clearCart,
+    total,
+    isLoading,
+    error,
+    couponCode,
+    appliedCoupon,
+    couponError,
+    isValidatingCoupon,
+    applyCoupon,
+    removeCoupon,
+  } = useCart();
   const router = useRouter();
-  const [coupon, setCoupon] = useState("");
-  const [appliedCoupon, setAppliedCoupon] = useState<CouponValidationResult | null>(null);
-  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+  const [couponInput, setCouponInput] = useState("");
 
-  const shipping = total > 50 ? 0 : 5.99;
-  const tax = 0;
   const subtotal = total;
+  // Match backend shipping configuration (₹999 free shipping threshold, ₹99 flat fee otherwise)
+  const shipping = subtotal >= 999 || subtotal === 0 ? 0 : 99;
+  const tax = +(subtotal * 0.18).toFixed(2);
   const discount = appliedCoupon?.discountAmount ?? 0;
-  const grandTotal = subtotal + shipping + tax - discount;
+  const grandTotal = +(subtotal + shipping + tax - discount).toFixed(2);
 
-  useEffect(() => {
-    const storedCode =
-      typeof window !== "undefined"
-        ? window.localStorage.getItem(APPLIED_COUPON_STORAGE_KEY)
-        : null;
-
-    if (!storedCode || subtotal <= 0) {
-      setAppliedCoupon(null);
-      return;
-    }
-
-    setCoupon(storedCode);
-    let ignore = false;
-
-    void couponsService
-      .validateCoupon({ code: storedCode, orderAmount: subtotal })
-      .then((result) => {
-        if (ignore) return;
-        setAppliedCoupon(result);
-      })
-      .catch(() => {
-        if (ignore) return;
-        setAppliedCoupon(null);
-        window.localStorage.removeItem(APPLIED_COUPON_STORAGE_KEY);
-      });
-
-    return () => {
-      ignore = true;
-    };
-  }, [subtotal]);
+  // Sync state with active coupon code from context during render to avoid cascading renders
+  const [prevCouponCode, setPrevCouponCode] = useState(couponCode);
+  if (couponCode !== prevCouponCode) {
+    setPrevCouponCode(couponCode);
+    setCouponInput(couponCode ?? "");
+  }
 
   const handleApplyCoupon = async () => {
-    if (!coupon.trim()) {
-      toast.error("Enter a coupon code first.");
+    const code = couponInput.trim();
+    if (!code) {
+      toast.error("Please enter a coupon code.");
       return;
     }
-
-    setIsApplyingCoupon(true);
-    try {
-      const result = await couponsService.validateCoupon({
-        code: coupon.trim().toUpperCase(),
-        orderAmount: subtotal,
-      });
-      setCoupon(result.code);
-      setAppliedCoupon(result);
-      window.localStorage.setItem(APPLIED_COUPON_STORAGE_KEY, result.code);
-      toast.success("Coupon applied.");
-    } catch (err: any) {
-      setAppliedCoupon(null);
-      window.localStorage.removeItem(APPLIED_COUPON_STORAGE_KEY);
-      toast.error(err?.response?.data?.message ?? "Could not apply coupon.");
-    } finally {
-      setIsApplyingCoupon(false);
+    const success = await applyCoupon(code);
+    if (success) {
+      toast.success("Coupon applied successfully!");
+    } else {
+      toast.error("Could not apply coupon.");
     }
   };
 
   const clearAppliedCoupon = () => {
-    setAppliedCoupon(null);
-    setCoupon("");
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(APPLIED_COUPON_STORAGE_KEY);
-    }
+    removeCoupon();
+    setCouponInput("");
+    toast.info("Coupon removed");
   };
 
   return (
@@ -200,35 +173,32 @@ const CartPage = () => {
 
               {/* Coupon + Clear */}
               <div className="border-t border-border pt-6 mt-2">
-                <p className="text-sm text-muted-foreground mb-3">Have a coupon? Enter your code.</p>
-                <div className="flex gap-3 flex-wrap">
-                  <input
-                    type="text"
-                    value={coupon}
-                    onChange={(e) => {
-                      setCoupon(e.target.value.toUpperCase());
-                      if (appliedCoupon && e.target.value.toUpperCase() !== appliedCoupon.code) {
-                        setAppliedCoupon(null);
-                      }
-                    }}
-                    placeholder="Coupon code"
-                    className="flex-1 min-w-[140px] max-w-xs bg-card border border-border text-sm rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-ring/20 transition-all placeholder:text-muted-foreground"
-                  />
+                <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-1.5">
+                  <Tag className="w-4 h-4 text-primary" /> Promotions & Coupons
+                </h3>
+                <div className="flex gap-3 items-center">
+                  <div className="relative flex-1 max-w-xs">
+                    <input
+                      type="text"
+                      value={couponInput}
+                      onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                      placeholder="Enter coupon code"
+                      disabled={isValidatingCoupon || isLoading}
+                      className="w-full bg-card border border-border text-sm rounded-xl py-2.5 pl-4 pr-10 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all placeholder:text-muted-foreground"
+                    />
+                    {isValidatingCoupon && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
                   <button
                     onClick={handleApplyCoupon}
-                    disabled={isApplyingCoupon || subtotal <= 0}
-                    className="border border-border text-sm font-semibold text-foreground px-5 py-2.5 rounded-xl hover:bg-secondary transition-colors uppercase tracking-wider disabled:opacity-50"
+                    disabled={isValidatingCoupon || isLoading || !couponInput.trim() || subtotal === 0}
+                    className="bg-primary text-primary-foreground text-sm font-bold px-6 py-2.5 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all uppercase tracking-wider disabled:opacity-50 disabled:pointer-events-none"
                   >
-                    {isApplyingCoupon ? "Applying..." : "Apply"}
+                    Apply
                   </button>
-                  {appliedCoupon ? (
-                    <button
-                      onClick={clearAppliedCoupon}
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      Remove coupon
-                    </button>
-                  ) : null}
                   <button
                     onClick={() => clearCart()}
                     disabled={isLoading || items.length === 0}
@@ -237,47 +207,135 @@ const CartPage = () => {
                     <RefreshCw className="w-4 h-4" /> Clear Cart
                   </button>
                 </div>
+
+                {/* Applied Coupon Ticket */}
                 {appliedCoupon && (
-                  <p className="text-xs text-success mt-2">
-                    {appliedCoupon.code} applied. You saved ₹{appliedCoupon.discountAmount.toFixed(2)}.
-                  </p>
+                  <div className="mt-4 p-4 relative overflow-hidden bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border border-emerald-500/25 rounded-2xl text-emerald-800 dark:text-emerald-300 flex items-center justify-between shadow-sm">
+                    {/* Physical ticket edge cutouts */}
+                    <div className="absolute top-1/2 -left-2.5 w-5 h-5 bg-background rounded-full border-r border-emerald-500/25 -translate-y-1/2" />
+                    <div className="absolute top-1/2 -right-2.5 w-5 h-5 bg-background rounded-full border-l border-emerald-500/25 -translate-y-1/2" />
+
+                    <div className="flex items-center gap-3 pl-2">
+                      <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                        <Ticket className="w-5 h-5 rotate-45" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-bold tracking-wider text-sm bg-emerald-500/20 px-2 py-0.5 rounded text-emerald-700 dark:text-emerald-300">
+                            {appliedCoupon.code}
+                          </span>
+                          <span className="text-xs font-semibold flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400">
+                            <Check className="w-3.5 h-3.5" /> Applied
+                          </span>
+                        </div>
+                        <p className="text-xs font-bold mt-1 text-foreground">
+                          {appliedCoupon.couponName || "Discount Applied"}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          {appliedCoupon.type === "PERCENTAGE" ? `${appliedCoupon.value}% off` : `₹${appliedCoupon.value.toFixed(2)} off`}
+                          {appliedCoupon.expiresAt && ` • Expires ${new Date(appliedCoupon.expiresAt).toLocaleDateString()}`}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right pr-2">
+                      <p className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">
+                        -₹{appliedCoupon.discountAmount.toFixed(2)}
+                      </p>
+                      <button
+                        onClick={clearAppliedCoupon}
+                        className="text-xs text-muted-foreground hover:text-foreground underline transition-all mt-1"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Coupon Errors & Min Order Value Progress Banners */}
+                {couponError && (
+                  (() => {
+                    const match = couponError.match(/Minimum order value for this coupon is (\d+(?:\.\d+)?)/i);
+                    const minOrder = match ? parseFloat(match[1]) : null;
+                    if (minOrder && subtotal < minOrder) {
+                      const gap = minOrder - subtotal;
+                      const percent = Math.min(100, Math.max(0, (subtotal / minOrder) * 100));
+                      return (
+                        <div className="mt-4 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-amber-800 dark:text-amber-300">
+                          <div className="flex items-start gap-2.5">
+                            <AlertCircle className="w-5 h-5 mt-0.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold">Unlock Coupon Discount!</p>
+                              <p className="text-xs mt-1">
+                                Add <span className="font-bold">₹{gap.toFixed(2)}</span> more to activate coupon <span className="font-mono bg-amber-500/20 px-1.5 py-0.5 rounded text-xs">{couponInput}</span>
+                              </p>
+                              <div className="w-full bg-border/40 rounded-full h-2 mt-3 overflow-hidden">
+                                <div
+                                  className="bg-amber-500 h-full rounded-full transition-all duration-500 ease-out"
+                                  style={{ width: `${percent}%` }}
+                                />
+                              </div>
+                              <p className="text-[10px] text-muted-foreground mt-1.5 text-right font-medium">
+                                ₹{subtotal.toFixed(2)} / ₹{minOrder.toFixed(2)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-2xl text-destructive">
+                        <div className="flex items-center gap-2.5">
+                          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                          <p className="text-xs font-semibold">{couponError}</p>
+                        </div>
+                      </div>
+                    );
+                  })()
                 )}
               </div>
             </div>
 
             {/* Cart Totals */}
             <div>
-              <div className="bg-card rounded-2xl shadow-card p-6 sticky top-24">
+              <div className="bg-card rounded-3xl border border-border shadow-card p-6 sticky top-24">
                 <h2 className="text-lg font-bold text-foreground uppercase tracking-tight mb-4">Cart Totals</h2>
-                <div className="border-t border-border pt-4 flex flex-col gap-3">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Shipping (3-5 Business Days)</span>
-                    <span className="font-medium text-foreground">{shipping === 0 ? "Free" : `₹${shipping.toFixed(2)}`}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">TAX (estimated)</span>
-                    <span className="font-medium text-foreground">₹{tax.toFixed(0)}</span>
-                  </div>
+                <div className="flex flex-col gap-4">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span className="font-medium text-foreground">₹{subtotal.toFixed(2)}</span>
+                    <span className="font-semibold text-foreground">₹{subtotal.toFixed(2)}</span>
                   </div>
                   {appliedCoupon && (
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Coupon ({appliedCoupon.code})</span>
-                      <span className="font-medium text-success">-₹{appliedCoupon.discountAmount.toFixed(2)}</span>
+                      <span className="font-semibold text-success">-₹{appliedCoupon.discountAmount.toFixed(2)}</span>
                     </div>
                   )}
-                </div>
-                <div className="border-t border-border mt-4 pt-4 flex justify-between">
-                  <span className="text-base font-bold text-foreground">Total</span>
-                  <span className="text-base font-bold text-foreground">₹{grandTotal.toFixed(2)}</span>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">GST (18%)</span>
+                    <span className="font-semibold text-foreground">₹{tax.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground flex flex-col">
+                      <span>Shipping</span>
+                      {shipping === 0 && subtotal > 0 && (
+                        <span className="text-[10px] text-success font-medium">Free Shipping applied</span>
+                      )}
+                      {shipping > 0 && (
+                        <span className="text-[10px] text-muted-foreground">Free on orders above ₹999</span>
+                      )}
+                    </span>
+                    <span className="font-semibold text-foreground">{shipping === 0 ? "Free" : `₹${shipping.toFixed(2)}`}</span>
+                  </div>
+                  <div className="border-t border-border mt-2 pt-4 flex justify-between items-baseline">
+                    <span className="text-base font-bold text-foreground">Total</span>
+                    <span className="text-xl font-extrabold text-foreground">₹{grandTotal.toFixed(2)}</span>
+                  </div>
                 </div>
 
                 <button
                   onClick={() => router.push("/checkout")}
-                  disabled={isLoading || items.some((i) => i.stock === 0)}
-                  className="w-full bg-primary text-primary-foreground font-semibold py-3.5 rounded-full text-sm mt-6 hover:opacity-90 transition-opacity active:scale-[0.98] uppercase tracking-wider shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isLoading || items.some((i) => i.stock === 0) || items.length === 0}
+                  className="w-full bg-primary text-primary-foreground font-semibold py-3.5 rounded-full text-sm mt-6 hover:opacity-90 active:scale-[0.98] transition-all uppercase tracking-wider shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? (
                     <span className="flex items-center justify-center gap-2">
@@ -289,7 +347,7 @@ const CartPage = () => {
                 </button>
 
                 {items.some((i) => i.stock === 0) && (
-                  <p className="text-xs text-destructive text-center mt-3">
+                  <p className="text-xs text-destructive text-center mt-3 font-medium">
                     Remove out-of-stock items before checkout
                   </p>
                 )}

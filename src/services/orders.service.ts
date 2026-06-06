@@ -18,6 +18,7 @@ export interface ShippingAddress {
   city: string;
   state: string;
   zip: string;
+  country: string;
 }
 
 export interface Order {
@@ -61,6 +62,7 @@ export interface CreateOrderInput {
   shippingCity: string;
   shippingState: string;
   shippingZip: string;
+  shippingCountry: string;
   paymentMethod?: 'COD' | 'PREPAID';
   couponCode?: string;
 }

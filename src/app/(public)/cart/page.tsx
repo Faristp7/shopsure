@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, X, Minus, Plus, RefreshCw, AlertCircle, Loader2, Tag, Check, Ticket } from "lucide-react";
 import { useCart } from "../context/CartContext";
+import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 
 const CartPage = () => {
@@ -23,6 +24,7 @@ const CartPage = () => {
     applyCoupon,
     removeCoupon,
   } = useCart();
+  const { isLoggedIn, setShowLogin } = useAuth();
   const router = useRouter();
   const [couponInput, setCouponInput] = useState("");
 
@@ -333,7 +335,15 @@ const CartPage = () => {
                 </div>
 
                 <button
-                  onClick={() => router.push("/checkout")}
+                  onClick={() => {
+                    if (!isLoggedIn) {
+                      localStorage.setItem("auth_redirect", "/checkout?action=add_address");
+                      setShowLogin(true);
+                      toast.info("Please sign in or create an account to proceed to checkout.");
+                    } else {
+                      router.push("/checkout");
+                    }
+                  }}
                   disabled={isLoading || items.some((i) => i.stock === 0) || items.length === 0}
                   className="w-full bg-primary text-primary-foreground font-semibold py-3.5 rounded-full text-sm mt-6 hover:opacity-90 active:scale-[0.98] transition-all uppercase tracking-wider shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 >

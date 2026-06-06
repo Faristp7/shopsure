@@ -113,6 +113,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     queryFn: () => ordersService.getSellerOrder(id),
   });
 
+  const confirmMutation = useMutation({
+    mutationFn: () => ordersService.confirmOrder(id),
+    onSuccess: () => {
+      toast.success("Order confirmed successfully");
+      queryClient.invalidateQueries({ queryKey: ["seller-order", id] });
+      queryClient.invalidateQueries({ queryKey: ["seller-orders"] });
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.message ?? "Failed to confirm order"),
+  });
+
   const shipMutation = useMutation({
     mutationFn: () => ordersService.shipOrder(id),
     onSuccess: () => {
@@ -179,6 +189,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   };
 
   const actions: { label: string; onClick: () => void; variant?: "default" | "destructive" | "outline"; loading?: boolean }[] = [];
+  if (order.status === "PAID") {
+    actions.push({ label: "Confirm Order", onClick: () => confirmMutation.mutate(), variant: "default", loading: confirmMutation.isPending });
+  }
   if (order.status === "CONFIRMED") {
     actions.push({ label: "Mark as Shipped", onClick: () => shipMutation.mutate(), variant: "default", loading: shipMutation.isPending });
   }

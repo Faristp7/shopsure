@@ -97,4 +97,28 @@ export const paymentsService = {
   processSellerPayout(sellerId: string): Promise<void> {
     return apiService.post(`${ADMIN_BASE}/sellers/${sellerId}/payout`);
   },
+
+  // Buyer
+  initiatePayment(orderId: string): Promise<{
+    paymentId: string;
+    providerOrderId: string;
+    amount: number;
+    currency: string;
+    keyId: string;
+    buyerName: string;
+    buyerEmail: string;
+    buyerPhone: string;
+    isMock: boolean;
+  }> {
+    return apiService.post(`v1/buyer/payments/${orderId}/initiate`);
+  },
+  verifyPayment(input: {
+    orderId: string;
+    providerOrderId: string;
+    providerPaymentId: string;
+    signature: string;
+    isMock?: boolean;
+  }): Promise<any> {
+    return apiService.post('v1/buyer/payments/verify', input);
+  },
 };

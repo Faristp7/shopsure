@@ -18,6 +18,7 @@ export interface ShippingAddress {
   city: string;
   state: string;
   zip: string;
+  country: string;
 }
 
 export interface Order {
@@ -25,6 +26,8 @@ export interface Order {
   status: string;
   paymentMethod: string;
   currency: string;
+  couponCode: string | null;
+  discountAmount: string;
   shippingAddress: ShippingAddress | null;
   subtotalAmount: string;
   shippingAmount: string;
@@ -43,6 +46,7 @@ export interface OrderSummary {
   id: string;
   status: string;
   paymentMethod: string;
+  couponCode: string | null;
   totalAmount: string;
   currency: string;
   itemCount: number;
@@ -58,7 +62,9 @@ export interface CreateOrderInput {
   shippingCity: string;
   shippingState: string;
   shippingZip: string;
+  shippingCountry: string;
   paymentMethod?: 'COD' | 'PREPAID';
+  couponCode?: string;
 }
 
 const BUYER_BASE = 'v1/buyer/orders';

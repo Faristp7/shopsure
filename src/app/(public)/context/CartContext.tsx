@@ -11,6 +11,7 @@ import {
 } from "react";
 import { cartService } from "@/services/cart.service";
 import { useAuth } from "./AuthContext";
+import { couponsService, type CouponValidationResult } from "@/services/coupons.service";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -42,6 +43,8 @@ export interface AddCartItemInput {
   stock?: number;
 }
 
+const APPLIED_COUPON_STORAGE_KEY = "shopsure_applied_coupon_code";
+
 interface CartContextType {
   items: CartItem[];
   isLoading: boolean;
@@ -53,6 +56,12 @@ interface CartContextType {
   clearCart: () => Promise<void>;
   total: number;
   itemCount: number;
+  couponCode: string | null;
+  appliedCoupon: CouponValidationResult | null;
+  couponError: string | null;
+  isValidatingCoupon: boolean;
+  applyCoupon: (code: string) => Promise<boolean>;
+  removeCoupon: () => void;
 }
 
 // ─── Guest storage ────────────────────────────────────────────────────────────
@@ -105,6 +114,11 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [couponCode, setCouponCode] = useState<string | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponValidationResult | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
 
   /** True once we have loaded the initial state (prevents flicker) */
   const initialised = useRef(false);
@@ -386,6 +400,95 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
 
+  // ── Coupon Logic ─────────────────────────────────────────────────────────────
+
+  // Initialize couponCode from localStorage on client-side mount
+  useEffect(() => {
+    const stored =
+      typeof window !== "undefined"
+        ? window.localStorage.getItem(APPLIED_COUPON_STORAGE_KEY)
+        : null;
+    if (stored) {
+      setCouponCode(stored);
+    }
+  }, []);
+
+  // Debounced coupon validation when total or couponCode changes
+  useEffect(() => {
+    if (!couponCode || total <= 0) {
+      setAppliedCoupon(null);
+      setCouponError(null);
+      return;
+    }
+
+    setIsValidatingCoupon(true);
+    const timer = setTimeout(() => {
+      couponsService
+        .validateCoupon({ code: couponCode, orderAmount: total })
+        .then((result) => {
+          setAppliedCoupon(result);
+          setCouponError(null);
+        })
+        .catch((err) => {
+          setAppliedCoupon(null);
+          const msg = err?.response?.data?.message ?? "Invalid coupon";
+          setCouponError(msg);
+          // If it's a structural failure (expired, not found, inactive), clear couponCode
+          const isStructuralError =
+            msg.toLowerCase().includes("not found") ||
+            msg.toLowerCase().includes("expired") ||
+            msg.toLowerCase().includes("inactive") ||
+            msg.toLowerCase().includes("limit");
+          if (isStructuralError) {
+            setCouponCode(null);
+            if (typeof window !== "undefined") {
+              window.localStorage.removeItem(APPLIED_COUPON_STORAGE_KEY);
+            }
+          }
+        })
+        .finally(() => {
+          setIsValidatingCoupon(false);
+        });
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [couponCode, total]);
+
+  const applyCoupon = useCallback(async (code: string): Promise<boolean> => {
+    if (!code.trim()) return false;
+    const formattedCode = code.trim().toUpperCase();
+    setIsValidatingCoupon(true);
+    setCouponError(null);
+    try {
+      const result = await couponsService.validateCoupon({
+        code: formattedCode,
+        orderAmount: total,
+      });
+      setCouponCode(formattedCode);
+      setAppliedCoupon(result);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(APPLIED_COUPON_STORAGE_KEY, formattedCode);
+      }
+      return true;
+    } catch (err: unknown) {
+      setAppliedCoupon(null);
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Could not apply coupon";
+      setCouponError(msg);
+      return false;
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  }, [total]);
+
+  const removeCoupon = useCallback(() => {
+    setCouponCode(null);
+    setAppliedCoupon(null);
+    setCouponError(null);
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(APPLIED_COUPON_STORAGE_KEY);
+    }
+  }, []);
+
   // ── Cleanup debounce on unmount ──────────────────────────────────────────────
 
   useEffect(() => {
@@ -406,6 +509,12 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         clearCart,
         total,
         itemCount,
+        couponCode,
+        appliedCoupon,
+        couponError,
+        isValidatingCoupon,
+        applyCoupon,
+        removeCoupon,
       }}
     >
       {children}

@@ -2,16 +2,20 @@
 
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { useLocation } from "../../context/LocationContext";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { User, Mail, Phone, Camera, Package, Heart, MapPin, Settings, LogOut, ChevronRight } from "lucide-react";
+import { Mail, Phone, Camera, Package, Heart, MapPin, Settings, LogOut, ChevronRight, Navigation } from "lucide-react";
+import { LocationSelector } from "../../components/LocationSelector";
 
 export default function ProfilePage() {
-  const { isLoggedIn, user, updateProfile, logout } = useAuth();
+  const { user, updateProfile, logout } = useAuth();
+  const { location } = useLocation();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
+  const [locationOpen, setLocationOpen] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "" });
 
   // if (!isLoggedIn) return null; 
@@ -85,6 +89,25 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      <div className="bg-card rounded-2xl p-6 mb-6 shadow-card border border-border/50">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Preferred Location</p>
+            <div className="mt-2 flex items-center gap-2 text-foreground">
+              <MapPin className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold">{location?.label ?? "No location selected"}</span>
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              We use this to show the right city context and prefill delivery details faster.
+            </p>
+          </div>
+          <Button className="gap-2 rounded-full px-6" variant="outline" onClick={() => setLocationOpen(true)}>
+            <Navigation className="h-4 w-4" />
+            Change Location
+          </Button>
+        </div>
+      </div>
+
       {/* Menu */}
       <div className="bg-card rounded-2xl divide-y divide-border shadow-card border border-border/50 overflow-hidden">
         {menuItems.map((item) => (
@@ -113,6 +136,8 @@ export default function ProfilePage() {
         <LogOut className="w-5 h-5" />
         <span className="text-sm font-semibold">Sign Out from Device</span>
       </button>
+
+      <LocationSelector open={locationOpen} onOpenChange={setLocationOpen} />
     </div>
   );
 }

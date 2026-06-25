@@ -2,6 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { Mic } from 'lucide-react';
+import { useVoiceSearch } from '@/hooks/useVoiceSearch';
 import { buyerProductService } from '@/services/buyer-product.service';
 import type { ProductSearchSuggestion } from '@/types/product';
 
@@ -108,6 +110,13 @@ export function SearchBar({
     }
   }
 
+  const { isListening, startListening, stopListening, isSupported } = useVoiceSearch({
+    onResult: (text) => {
+      setQuery(text);
+      submitSearch(text);
+    },
+  });
+
   return (
     <div ref={containerRef} className="relative w-full">
       <input
@@ -122,6 +131,23 @@ export function SearchBar({
         aria-autocomplete="list"
         aria-expanded={isOpen}
       />
+
+      {/* Voice Search (Mic Button) */}
+      {isSupported && (
+        <button
+          type="button"
+          onClick={isListening ? stopListening : startListening}
+          className={`absolute right-10 top-1/2 -translate-y-1/2 p-1 rounded-full transition-all ${
+            isListening
+              ? "bg-red-500 text-white animate-pulse"
+              : "text-muted-foreground hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+          }`}
+          aria-label="Voice Search"
+          title={isListening ? "Listening... Click to stop" : "Voice Search"}
+        >
+          <Mic className="w-4 h-4" />
+        </button>
+      )}
 
       {/* Loading indicator */}
       {loading && (

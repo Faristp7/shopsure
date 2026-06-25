@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, Heart, Star, Package, Truck, CalendarCheck, Percent, ShoppingBag, Check, Loader2, BellRing, ThumbsUp, Send } from "lucide-react";
 import { useCart } from "../../context/CartContext";
@@ -17,6 +17,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { BuyerProductDetail, BuyerProduct } from "@/types/product";
 import { reviewsService, type Review } from "@/services/reviews.service";
+import { trackProductView, RecentlyViewed } from "@/components/public/products/RecentlyViewed";
+import { StickyActionBar } from "@/components/public/products/StickyActionBar";
+import { SimilarProducts } from "@/components/public/products/SimilarProducts";
+import { FrequentlyBoughtTogether } from "@/components/public/products/FrequentlyBoughtTogether";
+import { ReviewSummary, type ReviewItem } from "@/components/public/products/ReviewSummary";
 
 // ─── Gallery ────────────────────────────────────────────────────────────────
 
@@ -371,7 +376,6 @@ function StarRating({ value, onChange, size = "md" }: { value: number; onChange?
 
 function RatingReviews({ product }: { product: BuyerProductDetail }) {
   const queryClient = useQueryClient();
-  const avg = product.averageRating ? parseFloat(product.averageRating) : 0;
   const [showForm, setShowForm] = useState(false);
   const [rating, setRating] = useState(5);
   const [title, setTitle] = useState("");
@@ -380,16 +384,11 @@ function RatingReviews({ product }: { product: BuyerProductDetail }) {
   const { data, isLoading } = useQuery({
     queryKey: ["product-reviews", product.id],
     queryFn: () => reviewsService.getProductReviews(product.id),
-    staleTime: 60_000,
-  });
-
-  const markHelpfulMutation = useMutation({
-    mutationFn: reviewsService.markHelpful,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["product-reviews", product.id] }),
   });
 
   const submitMutation = useMutation({
-    mutationFn: reviewsService.createReview,
+    mutationFn: (input: { productId: string; orderId: string; rating: number; title: string; body: string }) =>
+      reviewsService.createReview(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["product-reviews", product.id] });
       setShowForm(false);
@@ -399,8 +398,26 @@ function RatingReviews({ product }: { product: BuyerProductDetail }) {
     },
   });
 
-  const reviews = data?.items ?? [];
-  const summary = data;
+  const handleMarkHelpful = async (reviewId: string) => {
+    await reviewsService.markHelpful(reviewId);
+    queryClient.invalidateQueries({ queryKey: ["product-reviews", product.id] });
+  };
+
+  const reviewsList: ReviewItem[] = (data?.items || []).map((r: any) => ({
+    id: r.id,
+    userName: r.userName || "Anonymous",
+    rating: r.rating,
+    title: r.title || "",
+    body: r.body || "",
+    verifiedPurchase: r.verifiedPurchase ?? false,
+    helpfulCount: r.helpfulCount || 0,
+    createdAt: r.createdAt,
+    images: r.images,
+  }));
+
+  const distribution = data?.distribution || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  const totalCount = data?.totalCount || reviewsList.length;
+  const avg = data?.averageRating || 0;
 
   return (
     <div className="bg-card rounded-2xl shadow-card p-6 space-y-6">
@@ -409,33 +426,6 @@ function RatingReviews({ product }: { product: BuyerProductDetail }) {
         <Button size="sm" variant="outline" onClick={() => setShowForm(!showForm)}>
           {showForm ? "Cancel" : "Write a Review"}
         </Button>
-      </div>
-
-      {/* Summary */}
-      <div className="flex items-start gap-6">
-        <div className="text-center">
-          <p className="text-5xl font-extrabold text-foreground">{avg > 0 ? avg.toFixed(1) : "—"}</p>
-          <StarRating value={Math.round(avg)} size="sm" />
-          <p className="text-xs text-muted-foreground mt-1">{product.ratingCount ?? reviews.length} reviews</p>
-        </div>
-        {summary && (
-          <div className="flex-1 space-y-1.5">
-            {([5, 4, 3, 2, 1] as const).map((star) => {
-              const count = summary.distribution?.[star] ?? 0;
-              const pct = summary.totalCount > 0 ? Math.round((count / summary.totalCount) * 100) : 0;
-              return (
-                <div key={star} className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span className="w-4 text-right">{star}</span>
-                  <Star className="w-3 h-3 fill-star text-star" />
-                  <div className="flex-1 bg-muted rounded-full h-1.5 overflow-hidden">
-                    <div className="h-full bg-star rounded-full transition-all" style={{ width: `${pct}%` }} />
-                  </div>
-                  <span className="w-7 text-right">{pct}%</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       {/* Write Review Form */}
@@ -466,45 +456,19 @@ function RatingReviews({ product }: { product: BuyerProductDetail }) {
         </div>
       )}
 
-      {/* Reviews List */}
       {isLoading ? (
         <div className="flex justify-center py-6">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </div>
-      ) : reviews.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-4">No reviews yet. Be the first to review!</p>
       ) : (
-        <div className="space-y-5 divide-y divide-border/40">
-          {reviews.map((review: Review) => (
-            <div key={review.id} className="pt-5 first:pt-0">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <StarRating value={review.rating} size="sm" />
-                    {review.verifiedPurchase && (
-                      <span className="text-[10px] font-bold text-success bg-success/10 px-2 py-0.5 rounded-full">Verified Purchase</span>
-                    )}
-                  </div>
-                  <p className="font-semibold text-sm mt-1.5">{review.title}</p>
-                </div>
-                <p className="text-xs text-muted-foreground shrink-0">
-                  {new Date(review.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                </p>
-              </div>
-              <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{review.body}</p>
-              <div className="flex items-center justify-between mt-3">
-                <p className="text-xs text-muted-foreground font-medium">{review.userName}</p>
-                <button
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  onClick={() => markHelpfulMutation.mutate(review.id)}
-                >
-                  <ThumbsUp className="w-3.5 h-3.5" />
-                  Helpful ({review.helpfulCount})
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+        <ReviewSummary
+          productId={product.id}
+          averageRating={avg}
+          totalCount={totalCount}
+          distribution={distribution}
+          reviews={reviewsList}
+          onMarkHelpful={handleMarkHelpful}
+        />
       )}
     </div>
   );
@@ -600,6 +564,24 @@ export default function ProductDetailClient({ product, relatedProducts }: Props)
 
   const images = Array.isArray(product.images) ? product.images : [];
   const attributes = Array.isArray(product.attributes) ? product.attributes : [];
+
+  // Track product view for Recently Viewed list
+  useEffect(() => {
+    if (product) {
+      trackProductView({
+        id: product.id,
+        title: product.title,
+        brand: product.brand,
+        price: product.price,
+        originalPrice: product.originalPrice,
+        averageRating: product.averageRating,
+        ratingCount: product.ratingCount,
+        images: product.images,
+        status: product.status,
+        category: product.category,
+      });
+    }
+  }, [product]);
 
   const handleMobileAddToCart = useCallback(async () => {
     if (mobileAddStatus !== "idle" || mobileIsOOS) return;
@@ -731,6 +713,11 @@ export default function ProductDetailClient({ product, relatedProducts }: Props)
           </div>
         </div>
 
+        <div className="mb-10 space-y-10">
+          <FrequentlyBoughtTogether currentProduct={product} />
+          <SimilarProducts currentProduct={product} />
+        </div>
+
         <div className="mb-10">
           <RatingReviews product={product} />
         </div>
@@ -738,57 +725,20 @@ export default function ProductDetailClient({ product, relatedProducts }: Props)
         <div className="mb-10">
           <RelatedProducts products={relatedProducts} />
         </div>
+
+        <div className="mb-10">
+          <RecentlyViewed currentProductId={product.id} limit={6} />
+        </div>
       </main>
 
       {/* Mobile sticky add to cart */}
-      <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border p-4 lg:hidden z-40 shadow-up">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className={`text-sm font-bold ${mobileIsOOS ? "text-muted-foreground" : "text-foreground"}`}>
-              {mobileIsOOS ? "Unavailable" : `₹${price.toFixed(2)}`}
-            </p>
-            <p className="text-xs text-muted-foreground line-clamp-1">
-              {product.title}
-            </p>
-          </div>
-          <div className="relative">
-            {mobileAddStatus === "success" && (
-              <span className="absolute inset-0 rounded-2xl pointer-events-none [animation:add-ripple_0.6s_ease_forwards] bg-green-400/25" />
-            )}
-            <button
-              onClick={handleMobileAddToCart}
-              disabled={mobileIsOOS || mobileAddStatus !== "idle"}
-              className={`font-semibold py-3 px-6 rounded-2xl text-sm transition-all duration-300 disabled:cursor-not-allowed
-                ${mobileIsOOS
-                  ? "bg-muted text-muted-foreground shadow-none"
-                  : mobileAddStatus === "success"
-                  ? "bg-green-500 text-white [animation:add-success-pop_0.35s_ease] active:scale-[0.98]"
-                  : mobileAddStatus === "loading"
-                  ? "bg-primary/80 text-primary-foreground cursor-wait"
-                  : mobileAddStatus === "error"
-                  ? "bg-destructive text-white active:scale-[0.98]"
-                  : "bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.98]"
-                }`}
-            >
-              {mobileIsOOS ? (
-                <span className="flex items-center gap-2">
-                  <BellRing className="w-4 h-4" /> Out of Stock
-                </span>
-              ) : mobileAddStatus === "loading" ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Adding…
-                </span>
-              ) : mobileAddStatus === "success" ? (
-                <span className="flex items-center gap-2">
-                  <Check className="w-4 h-4 stroke-[2.5]" /> Added!
-                </span>
-              ) : (
-                "Add to Cart"
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
+      <StickyActionBar
+        productId={product.id}
+        title={product.title}
+        price={price}
+        imageUrl={images[0]?.url}
+        stock={product.stock}
+      />
     </div>
   );
 }

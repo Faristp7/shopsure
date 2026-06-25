@@ -26,15 +26,20 @@ export function ServerStatusCheck() {
       }, 1500);
 
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://shopsurebe.onrender.com';
-        const baseUrl = apiUrl.replace(/\/$/, '');
+        const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'https://shopsurebe.onrender.com').replace(/\/+$/, '');
         
-        await fetch(`${baseUrl}/v1/health`, {
+        const controller = new AbortController();
+        const fetchTimeout = setTimeout(() => controller.abort(), 50000); // 50s for cold start
+        
+        await fetch(`${apiUrl}/v1/health`, {
           method: 'GET',
           headers: {
             'accept': '*/*'
-          }
+          },
+          signal: controller.signal,
         });
+        
+        clearTimeout(fetchTimeout);
       } catch (error) {
         console.error("Health check failed", error);
       } finally {

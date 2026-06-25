@@ -78,10 +78,20 @@ const AuthCard = () => {
       setTimeout(() => inputRefs.current[0]?.focus(), 100);
     } catch (error: any) {
       console.error("Registration failed:", error);
-      setAuthError(
-        error.response?.data?.message ||
-        "Registration failed. Please try again.",
-      );
+      if (error.message === "Network Error" || error.code === "ERR_NETWORK") {
+        setAuthError(
+          "Unable to reach the server. Please check your internet connection or try again in a moment — the server may be waking up.",
+        );
+      } else if (error.code === "ECONNABORTED") {
+        setAuthError(
+          "The request timed out. The server may be starting up — please try again in a moment.",
+        );
+      } else {
+        setAuthError(
+          error.response?.data?.message ||
+          "Registration failed. Please try again.",
+        );
+      }
     } finally {
       setIsLoading(false);
     }
@@ -110,10 +120,20 @@ const AuthCard = () => {
       router.push(next);
     } catch (error: any) {
       console.error("Login failed:", error);
-      setAuthError(
-        error.response?.data?.message ||
-        "Login failed. Please check your credentials.",
-      );
+      if (error.message === "Network Error" || error.code === "ERR_NETWORK") {
+        setAuthError(
+          "Unable to reach the server. Please check your internet connection or try again in a moment — the server may be waking up.",
+        );
+      } else if (error.code === "ECONNABORTED") {
+        setAuthError(
+          "The request timed out. The server may be starting up — please try again in a moment.",
+        );
+      } else {
+        setAuthError(
+          error.response?.data?.message ||
+          "Login failed. Please check your credentials.",
+        );
+      }
     } finally {
       setIsLoading(false);
     }

@@ -26,8 +26,6 @@ export default function UserLayout({
             </main>
             <Footer />
           </div>
-          <Toaster />
-          <Sonner />
           <Suspense fallback={null}>
             <LoginModal />
             <SignupModal />

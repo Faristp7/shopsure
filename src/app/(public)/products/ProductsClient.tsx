@@ -20,6 +20,12 @@ import { buyerCategoryService } from "@/services/buyer-category.service";
 import { useDebounce } from "@/hooks/use-debounce";
 import type { BuyerProduct } from "@/types/product";
 import { ProductsGridSkeleton } from "./ProductsSkeleton";
+import { ProductCard } from "@/components/public/products/ProductCard";
+import { Breadcrumbs } from "@/components/public/products/Breadcrumbs";
+import { QuickViewModal } from "@/components/public/products/QuickViewModal";
+import { RecentlyViewed } from "@/components/public/products/RecentlyViewed";
+import { SearchSuggestions } from "@/components/public/products/SearchSuggestions";
+import { useCart } from "@/app/(public)/context/CartContext";
 
 const priceRanges = [
   { label: "All Prices", min: 0, max: Infinity },
@@ -73,8 +79,10 @@ export default function ProductsClient({
   const [sortBy, setSortBy] = useState("newest");
   const [showFilters, setShowFilters] = useState(false);
   const [gridView, setGridView] = useState(true);
-  const [wishlist, setWishlist] = useState<string[]>([]);
   const [page, setPage] = useState(initialPage);
+  const [selectedQuickViewProduct, setSelectedQuickViewProduct] = useState<BuyerProduct | null>(null);
+  const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
+  const { addItem } = useCart();
 
   const debouncedSearch = useDebounce(searchInput, 400);
 
@@ -141,15 +149,6 @@ export default function ProductsClient({
     return ["All", ...Array.from(new Set(all))];
   }, [data?.items]);
 
-  const totalPages = data?.meta.totalPages ?? 1;
-  const total = data?.meta.total ?? 0;
-
-  const toggleWishlist = (id: string) => {
-    setWishlist((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
-  };
-
   const activeFilters = [
     selectedCategoryId
       ? (categories.find((c) => c.id === selectedCategoryId)?.name ?? null)
@@ -176,6 +175,22 @@ export default function ProductsClient({
     setSearchInput(val);
     setPage(1);
   };
+
+  const totalPages = data?.meta.totalPages ?? 1;
+  const total = data?.meta.total ?? 0;
+
+  // Build breadcrumb trail dynamically
+  const breadcrumbItems = [
+    { label: "Products", href: "/products" },
+    ...(selectedCategoryId
+      ? [
+          {
+            label: categories.find((c) => c.id === selectedCategoryId)?.name || "Category",
+            href: `/products?categoryId=${selectedCategoryId}`,
+          },
+        ]
+      : []),
+  ];
 
   const FilterPanel = ({ mobile = false }: { mobile?: boolean }) => (
     <div className={mobile ? "" : "space-y-6"}>
@@ -290,26 +305,10 @@ export default function ProductsClient({
   );
 
   return (
-    <div className="container py-6">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
-        <Link href="/" className="hover:text-foreground transition-colors">
-          Home
-        </Link>
-        <span>/</span>
-        <span className="text-foreground font-medium">All Products</span>
-      </div>
+    <div className="container py-6 space-y-6 font-display">
+      <Breadcrumbs items={breadcrumbItems} />
 
-      {/* Search bar */}
-      <div className="relative mb-6">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-        <input
-          type="text"
-          placeholder="Search products..."
-          value={searchInput}
-          onChange={(e) => handleSearchChange(e.target.value)}
-          className="w-full bg-card text-sm text-foreground pl-10 pr-4 py-2.5 rounded-xl shadow-card outline-none focus:ring-2 focus:ring-ring/20"
-        />
-      </div>
+
 
       {/* Toolbar */}
       <div className="flex items-center justify-between mb-6 gap-4">
@@ -399,7 +398,7 @@ export default function ProductsClient({
         </aside>
 
         {/* Product grid */}
-        <div className="flex-1">
+        <div className="flex-1 space-y-8">
           {isLoading || isFetching ? (
             <ProductsGridSkeleton />
           ) : isError ? (
@@ -428,162 +427,53 @@ export default function ProductsClient({
             </div>
           ) : gridView ? (
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-              {filtered.map((p) => {
-                const imageUrl = getCoverImage(p);
-                const discountPct = getDiscountPct(p);
-                return (
-                  <Link
-                    href={`/product/${p.id}`}
-                    key={p.id}
-                    className="bg-card rounded-2xl shadow-card overflow-hidden group hover:shadow-card-hover transition-shadow duration-300 relative"
-                  >
-                    <div className="aspect-square overflow-hidden relative bg-secondary">
-                      {imageUrl ? (
-                        <img
-                          src={imageUrl}
-                          alt={p.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
-                          No image
-                        </div>
-                      )}
-                      {discountPct > 0 && (
-                        <span className="absolute top-3 left-3 bg-discount text-primary-foreground text-[10px] font-bold px-2 py-0.5 rounded-full">
-                          -{discountPct}%
-                        </span>
-                      )}
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          toggleWishlist(p.id);
-                        }}
-                        className="absolute top-3 right-3 w-8 h-8 rounded-full bg-card/80 backdrop-blur-sm flex items-center justify-center hover:bg-card transition-colors z-10"
-                      >
-                        <Heart
-                          className={`w-4 h-4 ${
-                            wishlist.includes(p.id)
-                              ? "fill-destructive text-destructive"
-                              : "text-muted-foreground"
-                          }`}
-                        />
-                      </button>
-                    </div>
-                    <div className="p-4">
-                      {p.brand && (
-                        <p className="text-xs text-muted-foreground mb-1">
-                          {p.brand}
-                        </p>
-                      )}
-                      <p className="text-sm font-semibold text-foreground line-clamp-1">
-                        {p.title}
-                      </p>
-                      {p.averageRating && (
-                        <div className="flex items-center gap-1 mt-1.5">
-                          <Star className="w-3.5 h-3.5 fill-star text-star" />
-                          <span className="text-xs text-muted-foreground">
-                            {parseFloat(p.averageRating).toFixed(1)} (
-                            {p.ratingCount})
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-sm font-bold text-foreground">
-                          ₹{parseFloat(p.price).toFixed(2)}
-                        </span>
-                        {p.originalPrice && (
-                          <span className="text-xs text-muted-foreground line-through">
-                            ₹{parseFloat(p.originalPrice).toFixed(2)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
+              {filtered.map((p) => (
+                <ProductCard
+                  key={p.id}
+                  product={p}
+                  layout="grid"
+                  onQuickView={(prod) => {
+                    setSelectedQuickViewProduct(prod);
+                    setIsQuickViewOpen(true);
+                  }}
+                  onAddToCart={async (prod, e) => {
+                    e.preventDefault();
+                    const cover = prod.images?.find((img) => img.isCover)?.url ?? "";
+                    await addItem({
+                      id: prod.id,
+                      name: prod.title,
+                      price: parseFloat(prod.price),
+                      quantity: 1,
+                      image: cover,
+                    });
+                  }}
+                />
+              ))}
             </div>
           ) : (
             <div className="space-y-4">
-              {filtered.map((p) => {
-                const imageUrl = getCoverImage(p);
-                const discountPct = getDiscountPct(p);
-                return (
-                  <Link
-                    href={`/product/${p.id}`}
-                    key={p.id}
-                    className="bg-card rounded-2xl shadow-card overflow-hidden flex group hover:shadow-card-hover transition-shadow duration-300 relative"
-                  >
-                    <div className="w-36 sm:w-48 shrink-0 overflow-hidden relative bg-secondary">
-                      {imageUrl ? (
-                        <img
-                          src={imageUrl}
-                          alt={p.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
-                          No image
-                        </div>
-                      )}
-                      {discountPct > 0 && (
-                        <span className="absolute top-3 left-3 bg-discount text-primary-foreground text-[10px] font-bold px-2 py-0.5 rounded-full">
-                          -{discountPct}%
-                        </span>
-                      )}
-                    </div>
-                    <div className="p-4 flex flex-col justify-center flex-1">
-                      {p.brand && (
-                        <p className="text-xs text-muted-foreground mb-1">
-                          {p.brand}
-                        </p>
-                      )}
-                      <p className="text-sm font-semibold text-foreground">
-                        {p.title}
-                      </p>
-                      {p.averageRating && (
-                        <div className="flex items-center gap-1 mt-1.5">
-                          <Star className="w-3.5 h-3.5 fill-star text-star" />
-                          <span className="text-xs text-muted-foreground">
-                            {parseFloat(p.averageRating).toFixed(1)} (
-                            {p.ratingCount} reviews)
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-sm font-bold text-foreground">
-                          ₹{parseFloat(p.price).toFixed(2)}
-                        </span>
-                        {p.originalPrice && (
-                          <span className="text-xs text-muted-foreground line-through">
-                            ₹{parseFloat(p.originalPrice).toFixed(2)}
-                          </span>
-                        )}
-                      </div>
-                      {p.category && (
-                        <p className="text-xs text-muted-foreground mt-2">
-                          {p.category.name}
-                        </p>
-                      )}
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        toggleWishlist(p.id);
-                      }}
-                      className="absolute top-4 right-4 w-8 h-8 rounded-full bg-secondary flex items-center justify-center hover:bg-muted transition-colors"
-                    >
-                      <Heart
-                        className={`w-4 h-4 ${
-                          wishlist.includes(p.id)
-                            ? "fill-destructive text-destructive"
-                            : "text-muted-foreground"
-                        }`}
-                      />
-                    </button>
-                  </Link>
-                );
-              })}
+              {filtered.map((p) => (
+                <ProductCard
+                  key={p.id}
+                  product={p}
+                  layout="list"
+                  onQuickView={(prod) => {
+                    setSelectedQuickViewProduct(prod);
+                    setIsQuickViewOpen(true);
+                  }}
+                  onAddToCart={async (prod, e) => {
+                    e.preventDefault();
+                    const cover = prod.images?.find((img) => img.isCover)?.url ?? "";
+                    await addItem({
+                      id: prod.id,
+                      name: prod.title,
+                      price: parseFloat(prod.price),
+                      quantity: 1,
+                      image: cover,
+                    });
+                  }}
+                />
+              ))}
             </div>
           )}
 
@@ -642,6 +532,9 @@ export default function ProductsClient({
         </div>
       </div>
 
+      {/* Dynamic Recently Viewed section below catalog */}
+      <RecentlyViewed limit={5} />
+
       {/* Mobile filter drawer */}
       {showFilters && (
         <div className="fixed inset-0 z-50 lg:hidden">
@@ -673,6 +566,26 @@ export default function ProductsClient({
           </div>
         </div>
       )}
+
+      {/* Quick View Overlay Dialog */}
+      <QuickViewModal
+        product={selectedQuickViewProduct}
+        isOpen={isQuickViewOpen}
+        onClose={() => {
+          setIsQuickViewOpen(false);
+          setSelectedQuickViewProduct(null);
+        }}
+        onAddToCart={async (prod) => {
+          const cover = prod.images?.find((img) => img.isCover)?.url ?? "";
+          await addItem({
+            id: prod.id,
+            name: prod.title,
+            price: parseFloat(prod.price),
+            quantity: 1,
+            image: cover,
+          });
+        }}
+      />
     </div>
   );
 }
